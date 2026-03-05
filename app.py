@@ -741,5 +741,29 @@ def hash_artifacts():
 
 if __name__ == "__main__":
     init_db()
+    # Seed example artifacts if not already done
+    from seed_examples import seed_examples
+    from seed_examples_supplement import seed_supplement
+    conn_check = get_db()
+    try:
+        sample = conn_check.execute("SELECT example_artifacts FROM objectives LIMIT 1").fetchone()
+        if sample and not sample["example_artifacts"]:
+            conn_check.close()
+            seed_examples()
+            seed_supplement()
+        else:
+            conn_check.close()
+    except Exception:
+        conn_check.close()
+        try:
+            conn_check2 = get_db()
+            conn_check2.execute("ALTER TABLE objectives ADD COLUMN example_artifacts TEXT DEFAULT ''")
+            conn_check2.commit()
+            conn_check2.close()
+            seed_examples()
+            seed_supplement()
+        except Exception:
+            pass
+
     debug = os.environ.get("FLASK_DEBUG", "1") == "1"
     app.run(host="0.0.0.0", port=3300, debug=debug)
