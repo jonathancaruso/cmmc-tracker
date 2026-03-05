@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search | CMMC Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
+        header { margin-bottom: 1.5rem; }
+        .back { color: #94a3b8; text-decoration: none; font-size: 0.875rem; }
+        .back:hover { color: #e2e8f0; }
+        h1 { font-size: 1.5rem; margin-top: 0.5rem; }
+        .search-box { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .search-box input { flex: 1; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 0.75rem 1rem; border-radius: 0.5rem; font-size: 1rem; }
+        .search-box input:focus { border-color: #38bdf8; outline: none; }
+        .search-box button { background: #38bdf8; color: #0f172a; border: none; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; }
+        .count { color: #94a3b8; font-size: 0.875rem; margin-bottom: 1rem; }
+        .result { background: #1e293b; border-radius: 0.5rem; padding: 1rem; margin-bottom: 0.5rem; display: flex; gap: 1rem; align-items: start; }
+        .result:hover { background: #253348; }
+        .result .id { color: #38bdf8; font-weight: 700; font-size: 0.85rem; white-space: nowrap; min-width: 5rem; }
+        .result .body { flex: 1; }
+        .result .obj-text { font-size: 0.9rem; color: #cbd5e1; }
+        .result .meta { display: flex; gap: 0.75rem; margin-top: 0.4rem; font-size: 0.75rem; color: #64748b; flex-wrap: wrap; }
+        .family-link { color: #94a3b8; text-decoration: none; background: #334155; padding: 0.1rem 0.4rem; border-radius: 0.2rem; font-size: 0.7rem; }
+        .family-link:hover { color: #e2e8f0; }
+        .captured-tag { background: #064e3b; color: #34d399; padding: 0.1rem 0.4rem; border-radius: 0.2rem; font-size: 0.7rem; }
+        .pending-tag { background: #422006; color: #f59e0b; padding: 0.1rem 0.4rem; border-radius: 0.2rem; font-size: 0.7rem; }
+        .empty { text-align: center; color: #64748b; padding: 3rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back">← Back to Dashboard</a>
+            <h1>Search Objectives</h1>
+        </header>
+        <form class="search-box" method="GET" action="/search">
+            <input type="text" name="q" value="{{ q }}" placeholder="Search by ID, text, family..." autofocus>
+            <button type="submit">Search</button>
+        </form>
+        {% if q %}
+        <div class="count">{{ results|length }} result{{ 's' if results|length != 1 else '' }} for "{{ q }}"</div>
+        {% endif %}
+        {% for r in results %}
+        <div class="result">
+            <span class="id">{{ r['id'] }}</span>
+            <div class="body">
+                <div class="obj-text">{{ r['assessment_objective'] }}</div>
+                <div class="meta">
+                    <a href="/family/{{ r['family'] | urlencode }}" class="family-link">{{ r['family'] }}</a>
+                    <span>Req: {{ r['requirement_id'] }}</span>
+                    {% if r['captured'] %}<span class="captured-tag">CAPTURED</span>{% else %}<span class="pending-tag">PENDING</span>{% endif %}
+                    {% if r['assigned_to'] %}<span>👤 {{ r['assigned_to'] }}</span>{% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% if q and not results %}
+        <div class="empty">No objectives match "{{ q }}"</div>
+        {% endif %}
+    </div>
+</body>
+</html>

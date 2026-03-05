@@ -1,0 +1,47 @@
+<style>
+    .topnav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem; }
+    .topnav-left { display: flex; align-items: center; gap: 1rem; }
+    .topnav-left a.back { color: #94a3b8; text-decoration: none; font-size: 0.875rem; }
+    .topnav-left a.back:hover { color: #e2e8f0; }
+    .topnav-right { display: flex; gap: 0.5rem; align-items: center; }
+    .topnav .nav-search { position: relative; }
+    .topnav .nav-search input { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 0.4rem 0.6rem 0.4rem 1.8rem; border-radius: 0.5rem; font-size: 0.8rem; width: 180px; }
+    .topnav .nav-search input:focus { border-color: #38bdf8; outline: none; width: 280px; transition: width 0.2s; }
+    .topnav .nav-search .icon { position: absolute; left: 0.5rem; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 0.75rem; pointer-events: none; }
+    .topnav .search-results { position: absolute; top: 100%; left: 0; background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; margin-top: 0.25rem; max-height: 350px; overflow-y: auto; z-index: 100; display: none; min-width: 380px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+    .topnav .search-results.open { display: block; }
+    .topnav .sr-item { padding: 0.5rem 0.6rem; border-bottom: 1px solid #0f172a; cursor: pointer; display: flex; gap: 0.6rem; align-items: start; text-decoration: none; color: inherit; }
+    .topnav .sr-item:hover { background: #253348; }
+    .topnav .sr-item:last-child { border-bottom: none; }
+    .topnav .sr-id { color: #38bdf8; font-weight: 700; font-size: 0.7rem; min-width: 4rem; }
+    .topnav .sr-text { font-size: 0.75rem; color: #cbd5e1; flex: 1; }
+    .topnav .sr-family { color: #64748b; font-size: 0.65rem; }
+    .topnav .sr-status { font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 0.2rem; }
+    .topnav .sr-captured { background: #064e3b; color: #34d399; }
+    .topnav .sr-pending { background: #422006; color: #f59e0b; }
+    .topnav .sr-empty { padding: 0.75rem; text-align: center; color: #64748b; font-size: 0.8rem; }
+    .topnav .nav-btn { background: #334155; color: #e2e8f0; border: 1px solid #475569; padding: 0.4rem 0.75rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.8rem; text-decoration: none; }
+    .topnav .nav-btn:hover { background: #475569; }
+</style>
+<script>
+let _searchTimer;
+function _debounceNav(q) {
+    clearTimeout(_searchTimer);
+    if (!q.trim()) { document.getElementById('nav-sr').classList.remove('open'); return; }
+    _searchTimer = setTimeout(() => _doNavSearch(q), 250);
+}
+async function _doNavSearch(q) {
+    if (!q.trim()) return;
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const results = await res.json();
+    const c = document.getElementById('nav-sr');
+    if (!results.length) { c.innerHTML = '<div class="sr-empty">No results</div>'; }
+    else { c.innerHTML = results.slice(0,12).map(r => {
+        const reqId = r.requirement_id.replace(/\./g, '-');
+        return `<a href="/family/${encodeURIComponent(r.family)}#req-${reqId}" class="sr-item" onclick="sessionStorage.setItem('openReq','req-${reqId}')"><span class="sr-id">${r.id}</span><span class="sr-text">${r.assessment_objective}<div class="sr-family">${r.family}</div></span><span class="sr-status ${r.captured?'sr-captured':'sr-pending'}">${r.captured?'CAPTURED':'PENDING'}</span></a>`;
+    }).join(''); }
+    c.classList.add('open');
+}
+document.addEventListener('click', e => { if (!e.target.closest('.nav-search')) document.getElementById('nav-sr').classList.remove('open'); });
+document.addEventListener('keydown', e => { if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') { e.preventDefault(); document.getElementById('nav-si').focus(); }});
+</script>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMMC Artifact Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        h1 { font-size: 1.75rem; font-weight: 700; }
+        h1 span { color: #94a3b8; font-weight: 400; font-size: 1rem; margin-left: 0.5rem; }
+        
+        .export-btn { background: #334155; color: #e2e8f0; border: 1px solid #475569; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.875rem; text-decoration: none; }
+        .export-btn:hover { background: #475569; }
+        .header-links { display: flex; gap: 0.5rem; align-items: center; }
+        
+        .nav-search { position: relative; }
+        .nav-search input { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 0.5rem 0.75rem 0.5rem 2rem; border-radius: 0.5rem; font-size: 0.875rem; width: 220px; }
+        .nav-search input:focus { border-color: #38bdf8; outline: none; width: 320px; transition: width 0.2s; }
+        .nav-search .icon { position: absolute; left: 0.6rem; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 0.8rem; pointer-events: none; }
+        .search-results { position: absolute; top: 100%; left: 0; right: 0; background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; margin-top: 0.25rem; max-height: 400px; overflow-y: auto; z-index: 100; display: none; min-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.4); }
+        .search-results.open { display: block; }
+        .sr-item { padding: 0.6rem 0.75rem; border-bottom: 1px solid #0f172a; cursor: pointer; display: flex; gap: 0.75rem; align-items: start; }
+        .sr-item:hover { background: #253348; }
+        .sr-item:last-child { border-bottom: none; }
+        .sr-item .sr-id { color: #38bdf8; font-weight: 700; font-size: 0.75rem; min-width: 4.5rem; white-space: nowrap; }
+        .sr-item .sr-text { font-size: 0.8rem; color: #cbd5e1; flex: 1; }
+        .sr-item .sr-family { color: #64748b; font-size: 0.7rem; }
+        .sr-item .sr-status { font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 0.2rem; white-space: nowrap; }
+        .sr-captured { background: #064e3b; color: #34d399; }
+        .sr-pending { background: #422006; color: #f59e0b; }
+        .sr-empty { padding: 1rem; text-align: center; color: #64748b; font-size: 0.85rem; }
+        
+        /* Overall progress */
+        .overall { background: #1e293b; border-radius: 1rem; padding: 2rem; margin-bottom: 2rem; }
+        .overall h2 { font-size: 1.125rem; color: #94a3b8; margin-bottom: 1rem; }
+        .overall .stats { display: flex; gap: 2rem; align-items: center; margin-bottom: 1rem; }
+        .overall .big-num { font-size: 3rem; font-weight: 800; color: #38bdf8; }
+        .overall .big-num small { font-size: 1.25rem; color: #94a3b8; font-weight: 400; }
+        .progress-bar { width: 100%; height: 1.5rem; background: #334155; border-radius: 0.75rem; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8); border-radius: 0.75rem; transition: width 0.5s ease; }
+        .pct-label { text-align: right; font-size: 0.875rem; color: #94a3b8; margin-top: 0.25rem; }
+        
+        /* Filter */
+        .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+        .filter-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 0.4rem 1rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.8rem; }
+        .filter-btn.active { background: #334155; color: #e2e8f0; border-color: #475569; }
+        
+        /* Family grid */
+        .families { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .family-card { background: #1e293b; border-radius: 0.75rem; padding: 1.25rem; border-left: 4px solid var(--accent); cursor: pointer; transition: transform 0.15s, background 0.15s; text-decoration: none; color: inherit; display: block; }
+        .family-card:hover { transform: translateY(-2px); background: #253348; }
+        .family-card .top { display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem; }
+        .family-card .abbr { background: var(--accent); color: #0f172a; font-weight: 800; font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 0.25rem; }
+        .family-card .count { color: #94a3b8; font-size: 0.875rem; }
+        .family-card .name { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.75rem; }
+        .family-card .bar { width: 100%; height: 0.5rem; background: #334155; border-radius: 0.25rem; overflow: hidden; }
+        .family-card .bar-fill { height: 100%; background: var(--accent); border-radius: 0.25rem; transition: width 0.5s; }
+        .family-card .pct { font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem; text-align: right; }
+        
+        .hidden { display: none !important; }
+        
+        .hash-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 200; justify-content: center; align-items: center; }
+        .hash-modal.show { display: flex; }
+        .hash-content { background: #1e293b; border-radius: 0.75rem; padding: 2rem; max-width: 600px; width: 90%; }
+        .hash-content h2 { margin-bottom: 1rem; font-size: 1.125rem; }
+        .hash-content .hash-val { background: #0f172a; border: 1px solid #334155; padding: 0.75rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.75rem; word-break: break-all; color: #34d399; margin: 0.5rem 0; }
+        .hash-content .hash-label { color: #94a3b8; font-size: 0.8rem; }
+        .hash-content .hash-stat { color: #38bdf8; font-weight: 600; }
+        .hash-content .close-btn { background: #334155; color: #e2e8f0; border: 1px solid #475569; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; margin-top: 1rem; }
+        .hash-content .dl-links { margin-top: 0.75rem; display: flex; gap: 0.5rem; }
+        .hash-content .dl-links a { color: #38bdf8; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CMMC Artifact Tracker <span>NIST 800-171 R2</span></h1>
+            <div class="header-links">
+                <div class="nav-search">
+                    <span class="icon">🔍</span>
+                    <input type="text" id="nav-search-input" placeholder="Search objectives..." 
+                           oninput="debounceSearch(this.value)" onfocus="if(this.value) doSearch(this.value)" autocomplete="off">
+                    <div class="search-results" id="search-results"></div>
+                </div>
+                <button class="export-btn" onclick="hashArtifacts(this)">🔒 Hash Artifacts</button>
+                <a href="/config" class="export-btn">⚙ Config</a>
+                <a href="/api/export" class="export-btn">⬇ Export CSV</a>
+            </div>
+        </header>
+        
+        <div class="overall">
+            <h2>Overall Progress</h2>
+            <div class="stats">
+                <div class="big-num">{{ totals['captured'] or 0 }} <small>/ {{ totals['total'] }}</small></div>
+                <div style="flex:1">
+                    {% set pct = ((totals['captured'] or 0) / totals['total'] * 100) | round(1) if totals['total'] > 0 else 0 %}
+                    <div class="progress-bar"><div class="progress-fill" style="width:{{ pct }}%"></div></div>
+                    <div class="pct-label">{{ pct }}% complete</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="filter-bar">
+            <button class="filter-btn active" onclick="filterFamilies('all', this)">All ({{ families|length }})</button>
+            <button class="filter-btn" onclick="filterFamilies('incomplete', this)">Incomplete</button>
+            <button class="filter-btn" onclick="filterFamilies('complete', this)">Complete</button>
+        </div>
+        
+        <div class="families" id="family-grid">
+            {% for f in families %}
+            {% set fpct = (f['captured'] / f['total'] * 100) | round(1) if f['total'] > 0 else 0 %}
+            <a href="/family/{{ f['family'] | urlencode }}" class="family-card" 
+               style="--accent: {{ colors.get(abbr.get(f['family'], ''), '#6366f1') }}"
+               data-pct="{{ fpct }}">
+                <div class="top">
+                    <span class="abbr">{{ abbr.get(f['family'], '??') }}</span>
+                    <span class="count">{{ f['captured'] }} / {{ f['total'] }}</span>
+                </div>
+                <div class="name">{{ f['family'] }}</div>
+                <div class="bar"><div class="bar-fill" style="width:{{ fpct }}%"></div></div>
+                <div class="pct">{{ fpct }}%</div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <script>
+    let searchTimer;
+    function debounceSearch(q) {
+        clearTimeout(searchTimer);
+        if (!q.trim()) { document.getElementById('search-results').classList.remove('open'); return; }
+        searchTimer = setTimeout(() => doSearch(q), 250);
+    }
+    
+    async function doSearch(q) {
+        if (!q.trim()) return;
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const results = await res.json();
+        const container = document.getElementById('search-results');
+        if (results.length === 0) {
+            container.innerHTML = '<div class="sr-empty">No results</div>';
+        } else {
+            container.innerHTML = results.slice(0, 15).map(r => {
+                const reqId = r.requirement_id.replace(/\./g, '-');
+                return `<a href="/family/${encodeURIComponent(r.family)}#req-${reqId}" onclick="sessionStorage.setItem('openReq','req-${reqId}')" class="sr-item" style="text-decoration:none;color:inherit;">
+                    <span class="sr-id">${r.id}</span>
+                    <span class="sr-text">
+                        ${r.assessment_objective}
+                        <div class="sr-family">${r.family} · ${r.requirement_id}</div>
+                    </span>
+                    <span class="sr-status ${r.captured ? 'sr-captured' : 'sr-pending'}">${r.captured ? 'CAPTURED' : 'PENDING'}</span>
+                </a>`;
+            }).join('') + (results.length > 15 ? `<div class="sr-empty">${results.length - 15} more results...</div>` : '');
+        }
+        container.classList.add('open');
+    }
+    
+    // Close search results when clicking outside
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.nav-search')) {
+            document.getElementById('search-results').classList.remove('open');
+        }
+    });
+    
+    // Keyboard shortcut: / to focus search
+    document.addEventListener('keydown', e => {
+        if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+            e.preventDefault();
+            document.getElementById('nav-search-input').focus();
+        }
+    });
+    
+    function filterFamilies(mode, btn) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.family-card').forEach(card => {
+            const pct = parseFloat(card.dataset.pct);
+            if (mode === 'all') card.classList.remove('hidden');
+            else if (mode === 'complete') card.classList.toggle('hidden', pct < 100);
+            else card.classList.toggle('hidden', pct >= 100);
+        });
+    }
+    async function hashArtifacts(btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ Hashing...';
+        try {
+            const res = await fetch('/api/hash-artifacts', { method: 'POST' });
+            const data = await res.json();
+            if (data.ok) {
+                document.getElementById('hash-count').textContent = data.artifacts_hashed;
+                document.getElementById('hash-value').textContent = data.log_hash;
+                document.getElementById('hash-dl-artifacts').href = '/' + data.artifacts_log;
+                document.getElementById('hash-dl-log').href = '/' + data.hash_log;
+                document.getElementById('hash-modal').classList.add('show');
+            }
+        } catch(e) { alert('Hashing failed: ' + e.message); }
+        btn.disabled = false;
+        btn.textContent = '🔒 Hash Artifacts';
+    }
+    </script>
+    
+    <div class="hash-modal" id="hash-modal" onclick="if(event.target===this)this.classList.remove('show')">
+        <div class="hash-content">
+            <h2>🔒 CMMC Artifact Hashing Complete</h2>
+            <p class="hash-label">Files hashed: <span class="hash-stat" id="hash-count"></span></p>
+            <p class="hash-label" style="margin-top:0.75rem;">CMMCAssessmentLogHash (SHA-256):</p>
+            <div class="hash-val" id="hash-value"></div>
+            <p class="hash-label" style="font-size:0.7rem;">This hash verifies the integrity of your artifact listing. Store it securely.</p>
+            <div class="dl-links">
+                <a id="hash-dl-artifacts" href="#" target="_blank">📄 CMMCAssessmentArtifacts.log</a>
+                <a id="hash-dl-log" href="#" target="_blank">📄 CMMCAssessmentLogHash.log</a>
+            </div>
+            <button class="close-btn" onclick="document.getElementById('hash-modal').classList.remove('show')">Close</button>
+        </div>
+    </div>
+</body>
+</html>

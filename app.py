@@ -1,0 +1,731 @@
+#!/usr/bin/env python3
+"""CMMC Artifact Tracker — Flask + SQLite"""
+
+import os
+import sqlite3
+import csv
+import io
+from datetime import datetime
+from flask import Flask, render_template, jsonify, request, Response
+from openpyxl import load_workbook
+
+app = Flask(__name__)
+DB_PATH = os.path.join(os.path.dirname(__file__), "cmmc.db")
+XLSX_PATH = os.path.join(os.path.dirname(__file__), "nist-800-171a.xlsx")
+XLSX_171_PATH = os.path.join(os.path.dirname(__file__), "nist-800-171.xlsx")
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf', '.doc', '.docx',
+                      '.xls', '.xlsx', '.txt', '.csv', '.pptx', '.zip', '.md'}
+
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_db()
+    # Always ensure artifacts table exists (even on existing DBs)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS artifacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            objective_id TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            file_size INTEGER,
+            mime_type TEXT,
+            uploaded_at TEXT NOT NULL,
+            FOREIGN KEY (objective_id) REFERENCES objectives(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            role TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS artifact_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            objective_id TEXT NOT NULL,
+            member_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'assigned',
+            due_date TEXT,
+            assigned_at TEXT NOT NULL,
+            FOREIGN KEY (objective_id) REFERENCES objectives(id),
+            FOREIGN KEY (member_id) REFERENCES team_members(id)
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+    # Migrate: add columns if they don't exist
+    try:
+        conn2 = get_db()
+        conn2.execute("SELECT requirement_type FROM objectives LIMIT 1")
+        conn2.close()
+    except Exception:
+        conn2 = get_db()
+        try:
+            conn2.execute("ALTER TABLE objectives ADD COLUMN requirement_type TEXT DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            conn2.execute("ALTER TABLE objectives ADD COLUMN discussion TEXT DEFAULT ''")
+        except Exception:
+            pass
+        conn2.commit()
+        conn2.close()
+
+    # Seed discussion and requirement_type from SP 800-171 xlsx
+    if os.path.exists(XLSX_171_PATH):
+        conn2 = get_db()
+        # Check if already seeded
+        sample = conn2.execute("SELECT discussion FROM objectives WHERE requirement_id = '3.1.1' LIMIT 1").fetchone()
+        if sample and not sample["discussion"]:
+            wb2 = load_workbook(XLSX_171_PATH, read_only=True)
+            ws2 = wb2["SP 800-171"]
+            for row in ws2.iter_rows(min_row=2, values_only=True):
+                req_id = str(row[2] or "").strip()
+                req_type = str(row[1] or "").strip()
+                discussion = str(row[5] or "").strip()
+                if req_id:
+                    conn2.execute(
+                        "UPDATE objectives SET requirement_type = ?, discussion = ? WHERE requirement_id = ?",
+                        (req_type, discussion, req_id)
+                    )
+            conn2.commit()
+            wb2.close()
+        conn2.close()
+
+    # Check if objectives already seeded
+    try:
+        c = get_db()
+        count = c.execute("SELECT COUNT(*) FROM objectives").fetchone()[0]
+        c.close()
+        if count > 0:
+            return
+    except Exception:
+        pass
+    conn = get_db()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS objectives (
+            id TEXT PRIMARY KEY,
+            family TEXT NOT NULL,
+            requirement_id TEXT NOT NULL,
+            sort_as TEXT,
+            security_requirement TEXT,
+            assessment_objective TEXT,
+            examine TEXT,
+            interview TEXT,
+            test TEXT,
+            captured INTEGER DEFAULT 0,
+            artifact_notes TEXT DEFAULT '',
+            captured_date TEXT
+        )
+    """)
+    # Parse xlsx — two passes: collect all rows, then insert
+    wb = load_workbook(XLSX_PATH, read_only=True)
+    ws = wb["SP800-171A"]
+    current_family = ""
+    current_req_id = ""
+    current_sec_req = ""
+    current_examine = ""
+    current_interview = ""
+    current_test = ""
+
+    # Track which requirements have bracket sub-items
+    all_rows = list(ws.iter_rows(min_row=2, values_only=True))
+    reqs_with_brackets = set()
+    for row in all_rows:
+        ident = str(row[1] or "").strip()
+        if "[" in ident:
+            reqs_with_brackets.add(ident.split("[")[0])
+
+    for row in all_rows:
+        family = row[0] or current_family
+        identifier = str(row[1] or "").strip()
+        sort_as = str(row[2] or "").strip()
+        sec_req = row[3]
+        obj_text = row[4]
+        examine = row[5]
+        interview = row[6]
+        test = row[7]
+
+        if not identifier:
+            continue
+
+        current_family = family
+
+        if "[" not in identifier:
+            # Parent requirement row — save context for sub-items
+            current_req_id = identifier
+            current_sec_req = sec_req or ""
+            current_examine = examine or ""
+            current_interview = interview or ""
+            current_test = test or ""
+            current_sort_as = sort_as
+            current_obj_text = obj_text or ""
+            # If this requirement has no bracket sub-items, insert it as a single objective
+            if identifier not in reqs_with_brackets and current_obj_text:
+                # Strip "Determine if:" or "Determine If: " prefix
+                obj_clean = current_obj_text
+                for prefix in ("Determine if: ", "Determine If: ", "Determine if:", "Determine If:"):
+                    if obj_clean.startswith(prefix):
+                        obj_clean = obj_clean[len(prefix):].strip()
+                        break
+                conn.execute("""
+                    INSERT OR IGNORE INTO objectives
+                    (id, family, requirement_id, sort_as, security_requirement,
+                     assessment_objective, examine, interview, test)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    identifier, current_family, identifier, sort_as,
+                    current_sec_req, obj_clean,
+                    current_examine, current_interview, current_test
+                ))
+        else:
+            # Assessment objective row (bracketed sub-item)
+            conn.execute("""
+                INSERT OR IGNORE INTO objectives 
+                (id, family, requirement_id, sort_as, security_requirement, 
+                 assessment_objective, examine, interview, test)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                identifier, current_family, current_req_id, sort_as,
+                current_sec_req, obj_text or "",
+                current_examine, current_interview, current_test
+            ))
+
+    conn.commit()
+    conn.close()
+    wb.close()
+    print(f"Database seeded from {XLSX_PATH}")
+
+
+FAMILY_ABBR = {
+    "Access Control": "AC",
+    "Awareness and Training": "AT",
+    "Audit and Accountability": "AU",
+    "Configuration Management": "CM",
+    "Identification and Authentication": "IA",
+    "Incident Response": "IR",
+    "Maintenance": "MA",
+    "Media Protection": "MP",
+    "Personnel Security": "PS",
+    "Physical Protection": "PE",
+    "Risk Assessment": "RA",
+    "Security Assessment": "CA",
+    "System and Communications Protection": "SC",
+    "System and Information Integrity": "SI",
+}
+
+FAMILY_COLORS = {
+    "AC": "#3b82f6", "AT": "#8b5cf6", "AU": "#ec4899", "CM": "#f59e0b",
+    "IA": "#10b981", "IR": "#ef4444", "MA": "#6366f1", "MP": "#14b8a6",
+    "PS": "#f97316", "PE": "#84cc16", "RA": "#06b6d4", "CA": "#a855f7",
+    "SC": "#0ea5e9", "SI": "#e11d48",
+}
+
+
+@app.route("/")
+def dashboard():
+    conn = get_db()
+    families = conn.execute("""
+        SELECT family, 
+               COUNT(*) as total,
+               SUM(CASE WHEN captured = 1 THEN 1 ELSE 0 END) as captured
+        FROM objectives GROUP BY family ORDER BY family
+    """).fetchall()
+    totals = conn.execute("""
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN captured = 1 THEN 1 ELSE 0 END) as captured
+        FROM objectives
+    """).fetchone()
+    conn.close()
+    return render_template("dashboard.html",
+                           families=families, totals=totals,
+                           abbr=FAMILY_ABBR, colors=FAMILY_COLORS)
+
+
+@app.route("/family/<path:family_name>")
+def family_detail(family_name):
+    conn = get_db()
+    objectives = conn.execute("""
+        SELECT * FROM objectives WHERE family = ? ORDER BY sort_as
+    """, (family_name,)).fetchall()
+    conn.close()
+
+    # Group by requirement
+    requirements = {}
+    for obj in objectives:
+        req_id = obj["requirement_id"]
+        if req_id not in requirements:
+            requirements[req_id] = {
+                "id": req_id,
+                "security_requirement": obj["security_requirement"],
+                "examine": obj["examine"],
+                "interview": obj["interview"],
+                "test": obj["test"],
+                "objectives": [],
+            }
+        requirements[req_id]["objectives"].append(dict(obj))
+
+    abbr = FAMILY_ABBR.get(family_name, "")
+    return render_template("family.html", family=family_name, abbr=abbr,
+                           requirements=requirements,
+                           color=FAMILY_COLORS.get(abbr, "#6366f1"))
+
+
+@app.route("/api/toggle", methods=["POST"])
+def toggle_objective():
+    data = request.json
+    obj_id = data.get("id")
+    captured = data.get("captured", False)
+    notes = data.get("artifact_notes", "")
+    conn = get_db()
+    now = datetime.now().strftime("%Y-%m-%d") if captured else None
+    conn.execute("""
+        UPDATE objectives SET captured = ?, artifact_notes = ?, captured_date = ?
+        WHERE id = ?
+    """, (1 if captured else 0, notes, now, obj_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/notes", methods=["POST"])
+def update_notes():
+    data = request.json
+    conn = get_db()
+    conn.execute("UPDATE objectives SET artifact_notes = ? WHERE id = ?",
+                 (data.get("notes", ""), data.get("id")))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/bulk", methods=["POST"])
+def bulk_update():
+    data = request.json
+    req_id = data.get("requirement_id")
+    captured = data.get("captured", True)
+    conn = get_db()
+    now = datetime.now().strftime("%Y-%m-%d") if captured else None
+    conn.execute("""
+        UPDATE objectives SET captured = ?, captured_date = ?
+        WHERE requirement_id = ?
+    """, (1 if captured else 0, now, req_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/export")
+def export_csv():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM objectives ORDER BY sort_as").fetchall()
+    # Get all assignments with member names
+    assignments = {}
+    for a in conn.execute("""
+        SELECT a.objective_id, t.name FROM artifact_assignments a
+        JOIN team_members t ON a.member_id = t.id
+        ORDER BY t.name
+    """).fetchall():
+        assignments.setdefault(a["objective_id"], []).append(a["name"])
+    conn.close()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Family", "Requirement", "Objective", "Captured",
+                     "Notes", "Date Captured", "Assigned To"])
+    for r in rows:
+        assigned = "; ".join(assignments.get(r["id"], []))
+        writer.writerow([r["id"], r["family"], r["requirement_id"],
+                         r["assessment_objective"],
+                         "Yes" if r["captured"] else "No",
+                         r["artifact_notes"], r["captured_date"] or "",
+                         assigned])
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment;filename=cmmc-progress.csv"})
+
+
+@app.route("/api/search")
+def api_search():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    conn = get_db()
+    results = conn.execute("""
+        SELECT id, family, requirement_id, assessment_objective, captured
+        FROM objectives
+        WHERE id LIKE ? OR assessment_objective LIKE ? 
+              OR family LIKE ? OR requirement_id LIKE ?
+              OR security_requirement LIKE ?
+        ORDER BY sort_as LIMIT 50
+    """, (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%")).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in results])
+
+
+@app.route("/search")
+def search_page():
+    q = request.args.get("q", "").strip()
+    results = []
+    if q:
+        conn = get_db()
+        results = conn.execute("""
+            SELECT o.*, GROUP_CONCAT(t.name, '; ') as assigned_to
+            FROM objectives o
+            LEFT JOIN artifact_assignments a ON o.id = a.objective_id
+            LEFT JOIN team_members t ON a.member_id = t.id
+            WHERE o.id LIKE ? OR o.assessment_objective LIKE ? 
+                  OR o.family LIKE ? OR o.requirement_id LIKE ?
+                  OR o.security_requirement LIKE ?
+            GROUP BY o.id
+            ORDER BY o.sort_as
+        """, (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%")).fetchall()
+        conn.close()
+    return render_template("search.html", q=q, results=results, abbr=FAMILY_ABBR, colors=FAMILY_COLORS)
+
+
+@app.route("/member/<int:member_id>")
+def member_detail(member_id):
+    conn = get_db()
+    member = conn.execute("SELECT * FROM team_members WHERE id = ?", (member_id,)).fetchone()
+    if not member:
+        conn.close()
+        return "Member not found", 404
+    assignments = conn.execute("""
+        SELECT a.*, o.family, o.assessment_objective, o.captured, o.captured_date, o.artifact_notes
+        FROM artifact_assignments a
+        JOIN objectives o ON a.objective_id = o.id
+        WHERE a.member_id = ?
+        ORDER BY o.sort_as
+    """, (member_id,)).fetchall()
+    # Stats
+    total = len(assignments)
+    completed = sum(1 for a in assignments if a["captured"])
+    overdue = sum(1 for a in assignments if a["due_date"] and a["due_date"] < datetime.now().strftime("%Y-%m-%d") and not a["captured"])
+    # Group by family
+    by_family = {}
+    for a in assignments:
+        fam = a["family"]
+        if fam not in by_family:
+            by_family[fam] = {"total": 0, "completed": 0, "items": []}
+        by_family[fam]["total"] += 1
+        if a["captured"]:
+            by_family[fam]["completed"] += 1
+        by_family[fam]["items"].append(dict(a))
+    conn.close()
+    return render_template("member.html", member=member, assignments=assignments,
+                           total=total, completed=completed, overdue=overdue,
+                           by_family=by_family, abbr=FAMILY_ABBR, colors=FAMILY_COLORS,
+                           now=datetime.now().strftime("%Y-%m-%d"))
+
+
+### Config / Team Management ###
+
+@app.route("/config")
+def config_page():
+    conn = get_db()
+    members = conn.execute("SELECT * FROM team_members ORDER BY name").fetchall()
+    # Get assignment counts per member
+    counts = {}
+    for m in members:
+        row = conn.execute(
+            "SELECT COUNT(*) as c FROM artifact_assignments WHERE member_id = ?",
+            (m["id"],)
+        ).fetchone()
+        counts[m["id"]] = row["c"]
+    conn.close()
+    return render_template("config.html", members=members, counts=counts)
+
+
+@app.route("/api/team", methods=["GET"])
+def list_team():
+    conn = get_db()
+    members = conn.execute("SELECT * FROM team_members ORDER BY name").fetchall()
+    conn.close()
+    return jsonify([dict(m) for m in members])
+
+
+@app.route("/api/team", methods=["POST"])
+def add_team_member():
+    data = request.json
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO team_members (name, role, email, created_at) VALUES (?, ?, ?, ?)",
+        (name, data.get("role", ""), data.get("email", ""),
+         datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/team/<int:member_id>", methods=["DELETE"])
+def delete_team_member(member_id):
+    conn = get_db()
+    conn.execute("DELETE FROM artifact_assignments WHERE member_id = ?", (member_id,))
+    conn.execute("DELETE FROM team_members WHERE id = ?", (member_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/team/<int:member_id>", methods=["PATCH"])
+def update_team_member(member_id):
+    data = request.json
+    conn = get_db()
+    conn.execute(
+        "UPDATE team_members SET name = ?, role = ?, email = ? WHERE id = ?",
+        (data.get("name", ""), data.get("role", ""), data.get("email", ""), member_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+### Assignments ###
+
+@app.route("/api/assignments/<objective_id>")
+def list_assignments(objective_id):
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT a.*, t.name as member_name, t.role as member_role
+        FROM artifact_assignments a
+        JOIN team_members t ON a.member_id = t.id
+        WHERE a.objective_id = ?
+        ORDER BY a.assigned_at DESC
+    """, (objective_id,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/assignments", methods=["POST"])
+def add_assignment():
+    data = request.json
+    objective_id = data.get("objective_id")
+    member_id = data.get("member_id")
+    if not objective_id or not member_id:
+        return jsonify({"error": "objective_id and member_id required"}), 400
+    conn = get_db()
+    # Prevent duplicate assignments
+    existing = conn.execute(
+        "SELECT id FROM artifact_assignments WHERE objective_id = ? AND member_id = ?",
+        (objective_id, member_id)
+    ).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"error": "Already assigned"}), 409
+    conn.execute("""
+        INSERT INTO artifact_assignments (objective_id, member_id, status, due_date, assigned_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (objective_id, member_id, data.get("status", "assigned"),
+          data.get("due_date"), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/assignments/<int:assignment_id>", methods=["DELETE"])
+def delete_assignment(assignment_id):
+    conn = get_db()
+    conn.execute("DELETE FROM artifact_assignments WHERE id = ?", (assignment_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/assignments/<int:assignment_id>/due", methods=["PATCH"])
+def update_assignment_due(assignment_id):
+    data = request.json
+    conn = get_db()
+    conn.execute("UPDATE artifact_assignments SET due_date = ? WHERE id = ?",
+                 (data.get("due_date") or None, assignment_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/assignments/<int:assignment_id>/status", methods=["PATCH"])
+def update_assignment_status(assignment_id):
+    data = request.json
+    conn = get_db()
+    conn.execute("UPDATE artifact_assignments SET status = ? WHERE id = ?",
+                 (data.get("status", "assigned"), assignment_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/assignments/bulk", methods=["POST"])
+def bulk_assign():
+    data = request.json
+    requirement_id = data.get("requirement_id")
+    member_id = data.get("member_id")
+    if not requirement_id or not member_id:
+        return jsonify({"error": "requirement_id and member_id required"}), 400
+    conn = get_db()
+    objectives = conn.execute(
+        "SELECT id FROM objectives WHERE requirement_id = ?", (requirement_id,)
+    ).fetchall()
+    added = 0
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for obj in objectives:
+        existing = conn.execute(
+            "SELECT id FROM artifact_assignments WHERE objective_id = ? AND member_id = ?",
+            (obj["id"], member_id)
+        ).fetchone()
+        if not existing:
+            conn.execute("""
+                INSERT INTO artifact_assignments (objective_id, member_id, status, assigned_at)
+                VALUES (?, ?, 'assigned', ?)
+            """, (obj["id"], member_id, now))
+            added += 1
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "added": added, "total": len(objectives)})
+
+
+### Artifacts ###
+
+@app.route("/api/artifacts/<objective_id>")
+def list_artifacts(objective_id):
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM artifacts WHERE objective_id = ? ORDER BY uploaded_at DESC",
+        (objective_id,)
+    ).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/upload", methods=["POST"])
+def upload_artifact():
+    objective_id = request.form.get("objective_id")
+    if not objective_id:
+        return jsonify({"error": "Missing objective_id"}), 400
+
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "No file provided"}), 400
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        return jsonify({"error": f"File type {ext} not allowed"}), 400
+
+    # Create per-objective subdirectory
+    safe_id = objective_id.replace("[", "").replace("]", "").replace(" ", "").replace("\t", "")
+    obj_dir = os.path.join(UPLOAD_DIR, safe_id)
+    os.makedirs(obj_dir, exist_ok=True)
+
+    # Unique filename
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    safe_name = "".join(c if c.isalnum() or c in ".-_" else "_" for c in file.filename)
+    filename = f"{timestamp}_{safe_name}"
+    filepath = os.path.join(obj_dir, filename)
+    file.save(filepath)
+
+    file_size = os.path.getsize(filepath)
+
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (objective_id, f"{safe_id}/{filename}", file.filename, file_size,
+          file.content_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"ok": True, "filename": filename})
+
+
+@app.route("/api/artifacts/delete/<int:artifact_id>", methods=["POST"])
+def delete_artifact(artifact_id):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+
+    # Delete file
+    filepath = os.path.join(UPLOAD_DIR, row["filename"])
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    conn.execute("DELETE FROM artifacts WHERE id = ?", (artifact_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/uploads/<path:filename>")
+def serve_upload(filename):
+    from flask import send_from_directory
+    return send_from_directory(UPLOAD_DIR, filename)
+
+
+@app.route("/api/hash-artifacts", methods=["POST"])
+def hash_artifacts():
+    """Generate CMMC-compliant SHA-256 hashes for all uploaded artifacts."""
+    import hashlib
+    results = []
+    for root, dirs, files in os.walk(UPLOAD_DIR):
+        for fname in sorted(files):
+            fpath = os.path.join(root, fname)
+            sha256 = hashlib.sha256()
+            with open(fpath, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    sha256.update(chunk)
+            rel_path = os.path.relpath(fpath, UPLOAD_DIR)
+            results.append({
+                "algorithm": "SHA256",
+                "hash": sha256.hexdigest().upper(),
+                "path": rel_path
+            })
+
+    # Write CMMCAssessmentArtifacts.log
+    log_lines = [f"{'Algorithm':<12} {'Hash':<64} Path"]
+    log_lines.append(f"{'-'*12} {'-'*64} {'-'*4}")
+    for r in results:
+        log_lines.append(f"{r['algorithm']:<12} {r['hash']:<64} {r['path']}")
+    log_content = "\n".join(log_lines)
+
+    artifacts_log = os.path.join(UPLOAD_DIR, "CMMCAssessmentArtifacts.log")
+    with open(artifacts_log, "w", encoding="ascii") as f:
+        f.write(log_content)
+
+    # Hash the log file itself
+    sha256 = hashlib.sha256()
+    with open(artifacts_log, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha256.update(chunk)
+    log_hash = sha256.hexdigest().upper()
+
+    hash_log = os.path.join(UPLOAD_DIR, "CMMCAssessmentLogHash.log")
+    with open(hash_log, "w", encoding="ascii") as f:
+        f.write(f"{'Algorithm':<12} {'Hash':<64} Path\n")
+        f.write(f"{'-'*12} {'-'*64} {'-'*4}\n")
+        f.write(f"{'SHA256':<12} {log_hash:<64} CMMCAssessmentArtifacts.log\n")
+
+    return jsonify({
+        "ok": True,
+        "artifacts_hashed": len(results),
+        "log_hash": log_hash,
+        "artifacts_log": "uploads/CMMCAssessmentArtifacts.log",
+        "hash_log": "uploads/CMMCAssessmentLogHash.log"
+    })
+
+
+if __name__ == "__main__":
+    init_db()
+    app.run(host="0.0.0.0", port=3300, debug=True)
