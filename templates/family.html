@@ -559,6 +559,12 @@
         }, 200);
     }
 
+    function refreshAllVisibleArtifacts() {
+        document.querySelectorAll('.req-body.open .artifact-list[data-obj-id]').forEach(el => {
+            loadArtifacts(el.dataset.objId);
+        });
+    }
+
     async function doLinkArtifact(artifactId, objectiveId, currentObjId, input) {
         const res = await fetch(`/api/artifacts/${artifactId}/link`, {
             method: 'POST',
@@ -569,14 +575,14 @@
         if (data.error) { showToast(data.error); }
         input.value = '';
         input.nextElementSibling.classList.remove('open');
-        loadArtifacts(currentObjId);
+        refreshAllVisibleArtifacts();
     }
 
     async function unlinkArtifact(artifactId, objectiveId, currentObjId) {
         const res = await fetch(`/api/artifacts/${artifactId}/link/${encodeURIComponent(objectiveId)}`, { method: 'DELETE' });
         const data = await res.json();
         if (data.error) { showToast(data.error); return; }
-        loadArtifacts(currentObjId);
+        refreshAllVisibleArtifacts();
     }
 
     // Close link search dropdowns on outside click
