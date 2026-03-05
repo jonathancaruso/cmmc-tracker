@@ -188,6 +188,9 @@
                             <input type="text" class="obj-notes" placeholder="Artifact notes..."
                                    value="{{ obj['artifact_notes'] or '' }}"
                                    onblur="saveNotes('{{ obj['id'] }}', this.value)">
+                            <input type="text" class="obj-notes" placeholder="How was this obtained?"
+                                   value="{{ obj['obtained_method'] or '' }}"
+                                   onblur="saveObtained('{{ obj['id'] }}', this.value)">
                             {% if obj['captured_date'] %}
                             <span class="obj-date">{{ obj['captured_date'] }}</span>
                             {% endif %}
@@ -353,10 +356,6 @@
                 <span style="color:#64748b;font-size:0.65rem;">
                     ${a.original_name !== displayName ? `orig: ${a.original_name} · ` : ''}${meta.join(' · ')}
                 </span>
-                <input type="text" class="obj-notes" placeholder="How was this obtained?"
-                       value="${(a.obtained_method || '').replace(/"/g, '&quot;')}"
-                       onblur="saveObtained(${a.id}, this.value)"
-                       style="width:100%;margin-top:0.2rem;font-size:0.65rem;background:#0f172a;border:1px solid #334155;border-radius:0.25rem;color:#e2e8f0;padding:0.2rem 0.4rem;">
             </span>`;
         }).join('');
     }
@@ -422,11 +421,11 @@
     // Ensure domains are loaded before anything else
     const domainsReady = loadDomains();
 
-    async function saveObtained(artifactId, value) {
-        await fetch(`/api/artifacts/${artifactId}/obtained`, {
-            method: 'PATCH',
+    async function saveObtained(objId, value) {
+        await fetch('/api/obtained', {
+            method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ obtained_method: value })
+            body: JSON.stringify({ id: objId, obtained_method: value })
         });
     }
 
