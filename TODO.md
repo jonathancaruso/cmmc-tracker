@@ -34,7 +34,7 @@
 - [x] Landing page
 
 ## Backlog (Priority Order)
-- [ ] Comments/activity log per objective
+- [x] Comments/activity log per objective
 - [ ] Dashboard charts (bar/pie for visual progress)
 - [ ] SSP mapping — link requirements to System Security Plan sections
 - [ ] Import/export full state as zip backup
