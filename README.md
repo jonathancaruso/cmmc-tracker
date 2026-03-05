@@ -18,17 +18,25 @@ Local tool for tracking NIST 800-171 Rev 2 assessment objective completion for C
 - **Basic/Derived classification** tags on each requirement
 - **Dark mode** UI
 
-## Requirements
+## Quick Start (Docker — recommended for work deployment)
 
-- Python 3.10+
-- pip
+```bash
+docker compose up -d
+```
 
-## Setup
+Open http://localhost:3300 (or http://YOUR-SERVER-IP:3300 from other machines on the network).
+
+Data persists in a Docker volume (`cmmc-data`). To back up:
+```bash
+docker compose cp cmmc-tracker:/data ./backup
+```
+
+## Development Setup (local Python)
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install flask openpyxl
+pip install -r requirements.txt
 python app.py
 ```
 

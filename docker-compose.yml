@@ -1,0 +1,11 @@
+services:
+  cmmc-tracker:
+    build: .
+    ports:
+      - "3300:3300"
+    volumes:
+      - cmmc-data:/data
+    restart: unless-stopped
+
+volumes:
+  cmmc-data:

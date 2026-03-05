@@ -10,10 +10,10 @@ from flask import Flask, render_template, jsonify, request, Response
 from openpyxl import load_workbook
 
 app = Flask(__name__)
-DB_PATH = os.path.join(os.path.dirname(__file__), "cmmc.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "cmmc.db"))
 XLSX_PATH = os.path.join(os.path.dirname(__file__), "nist-800-171a.xlsx")
 XLSX_171_PATH = os.path.join(os.path.dirname(__file__), "nist-800-171.xlsx")
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
+UPLOAD_DIR = os.environ.get("UPLOAD_PATH", os.path.join(os.path.dirname(__file__), "uploads"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf', '.doc', '.docx',
                       '.xls', '.xlsx', '.txt', '.csv', '.pptx', '.zip', '.md'}
@@ -728,4 +728,5 @@ def hash_artifacts():
 
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", port=3300, debug=True)
+    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+    app.run(host="0.0.0.0", port=3300, debug=debug)
