@@ -116,6 +116,18 @@ def init_db():
             FOREIGN KEY (objective_id) REFERENCES objectives(id)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            username TEXT,
+            action TEXT NOT NULL,
+            target_type TEXT,
+            target_id TEXT,
+            details TEXT,
+            timestamp TEXT NOT NULL
+        )
+    """)
     conn.commit()
 
     # Migrate existing DBs: add columns if they don't exist
@@ -323,6 +335,22 @@ def validate_password(password):
     return errors
 
 
+def log_audit(action, target_type=None, target_id=None, details=None, conn=None):
+    close = False
+    if conn is None:
+        conn = get_db()
+        close = True
+    conn.execute(
+        "INSERT INTO audit_log (user_id, username, action, target_type, target_id, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (session.get('user_id'), session.get('username'), action, target_type,
+         str(target_id) if target_id is not None else None, details,
+         datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    )
+    conn.commit()
+    if close:
+        conn.close()
+
+
 def admin_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
@@ -481,6 +509,8 @@ def toggle_objective():
         UPDATE objectives SET captured = ?, artifact_notes = ?, captured_date = ?, status = ?
         WHERE id = ?
     """, (1 if captured else 0, notes, now, status, obj_id))
+    log_audit('toggle', 'objective', obj_id,
+              f"Set to {'Complete' if captured else 'Not Started'}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -508,6 +538,7 @@ def update_status():
         UPDATE objectives SET status = ?, captured = ?, captured_date = COALESCE(?, captured_date)
         WHERE id = ?
     """, (status, captured, now, obj_id))
+    log_audit('status_change', 'objective', obj_id, f"Set status to {status}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "status": status, "captured": captured})
@@ -517,8 +548,10 @@ def update_status():
 def update_notes():
     data = request.json
     conn = get_db()
+    obj_id = data.get("id")
     conn.execute("UPDATE objectives SET artifact_notes = ? WHERE id = ?",
-                 (data.get("notes", ""), data.get("id")))
+                 (data.get("notes", ""), obj_id))
+    log_audit('notes_saved', 'objective', obj_id, 'Notes updated', conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -536,6 +569,8 @@ def bulk_update():
         UPDATE objectives SET captured = ?, captured_date = ?, status = ?
         WHERE requirement_id = ?
     """, (1 if captured else 0, now, status, req_id))
+    log_audit('bulk_toggle', 'objective', req_id,
+              f"Bulk set requirement {req_id} to {status}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -628,6 +663,9 @@ def update_poam():
         """, (obj_id, data.get("weakness", ""), data.get("remediation", ""),
               data.get("resources", ""), data.get("milestone_date") or None,
               data.get("risk_level", "Moderate"), now))
+    log_audit('poam_saved', 'poam', obj_id,
+              f"POA&M {'updated' if existing else 'created'} for {obj_id} (risk: {data.get('risk_level', 'Moderate')})",
+              conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -784,6 +822,7 @@ def add_team_member():
         (name, data.get("role", ""), data.get("email", ""),
          datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     )
+    log_audit('created', 'team', name, f"Created team member {name}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -793,8 +832,12 @@ def add_team_member():
 @admin_required
 def delete_team_member(member_id):
     conn = get_db()
+    member = conn.execute("SELECT name FROM team_members WHERE id = ?", (member_id,)).fetchone()
     conn.execute("DELETE FROM artifact_assignments WHERE member_id = ?", (member_id,))
     conn.execute("DELETE FROM team_members WHERE id = ?", (member_id,))
+    log_audit('deleted', 'team', member_id,
+              f"Deleted team member {member['name']}" if member else f"Deleted team member #{member_id}",
+              conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -809,6 +852,7 @@ def update_team_member(member_id):
         "UPDATE team_members SET name = ?, role = ?, email = ? WHERE id = ?",
         (data.get("name", ""), data.get("role", ""), data.get("email", ""), member_id)
     )
+    log_audit('edited', 'team', member_id, f"Updated team member {data.get('name', '')}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -835,6 +879,7 @@ def add_domain():
     conn = get_db()
     try:
         conn.execute("INSERT INTO domains (name, color) VALUES (?, ?)", (name, color))
+        log_audit('created', 'domain', name, f"Created domain {name}", conn=conn)
         conn.commit()
     except sqlite3.IntegrityError:
         conn.close()
@@ -850,6 +895,7 @@ def update_domain(domain_id):
     conn = get_db()
     conn.execute("UPDATE domains SET name = ?, color = ? WHERE id = ?",
                  (data.get("name", "").strip(), data.get("color", "#6366f1").strip(), domain_id))
+    log_audit('edited', 'domain', domain_id, f"Updated domain {data.get('name', '')}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -859,8 +905,12 @@ def update_domain(domain_id):
 @admin_required
 def delete_domain(domain_id):
     conn = get_db()
+    domain = conn.execute("SELECT name FROM domains WHERE id = ?", (domain_id,)).fetchone()
     conn.execute("UPDATE artifacts SET domain_id = NULL WHERE domain_id = ?", (domain_id,))
     conn.execute("DELETE FROM domains WHERE id = ?", (domain_id,))
+    log_audit('deleted', 'domain', domain_id,
+              f"Deleted domain {domain['name']}" if domain else f"Deleted domain #{domain_id}",
+              conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -903,6 +953,10 @@ def add_assignment():
         VALUES (?, ?, ?, ?, ?)
     """, (objective_id, member_id, data.get("status", "assigned"),
           data.get("due_date"), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    member = conn.execute("SELECT name FROM team_members WHERE id = ?", (member_id,)).fetchone()
+    member_name = member['name'] if member else f"#{member_id}"
+    log_audit('created', 'assignment', objective_id,
+              f"Assigned {objective_id} to {member_name}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -911,7 +965,13 @@ def add_assignment():
 @app.route("/api/assignments/<int:assignment_id>", methods=["DELETE"])
 def delete_assignment(assignment_id):
     conn = get_db()
+    asgn = conn.execute("""
+        SELECT a.objective_id, t.name FROM artifact_assignments a
+        JOIN team_members t ON a.member_id = t.id WHERE a.id = ?
+    """, (assignment_id,)).fetchone()
     conn.execute("DELETE FROM artifact_assignments WHERE id = ?", (assignment_id,))
+    detail = f"Removed assignment {asgn['objective_id']} from {asgn['name']}" if asgn else f"Deleted assignment #{assignment_id}"
+    log_audit('deleted', 'assignment', assignment_id, detail, conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -923,6 +983,8 @@ def update_assignment_due(assignment_id):
     conn = get_db()
     conn.execute("UPDATE artifact_assignments SET due_date = ? WHERE id = ?",
                  (data.get("due_date") or None, assignment_id))
+    log_audit('due_date_changed', 'assignment', assignment_id,
+              f"Due date set to {data.get('due_date') or 'none'}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -934,6 +996,8 @@ def update_assignment_status(assignment_id):
     conn = get_db()
     conn.execute("UPDATE artifact_assignments SET status = ? WHERE id = ?",
                  (data.get("status", "assigned"), assignment_id))
+    log_audit('status_change', 'assignment', assignment_id,
+              f"Assignment status set to {data.get('status', 'assigned')}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -963,6 +1027,11 @@ def bulk_assign():
                 VALUES (?, ?, 'assigned', ?)
             """, (obj["id"], member_id, now))
             added += 1
+    member = conn.execute("SELECT name FROM team_members WHERE id = ?", (member_id,)).fetchone()
+    member_name = member['name'] if member else f"#{member_id}"
+    log_audit('bulk_assign', 'assignment', requirement_id,
+              f"Bulk assigned {requirement_id} to {member_name} ({added} new of {len(objectives)} objectives)",
+              conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "added": added, "total": len(objectives)})
@@ -1119,6 +1188,7 @@ def upload_artifact():
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (objective_id, f"{safe_id}/{filename}", file.filename, file_size,
           file.content_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), domain_id, file_created))
+    log_audit('uploaded', 'artifact', objective_id, f"Uploaded {filename}", conn=conn)
     conn.commit()
     conn.close()
 
@@ -1139,6 +1209,8 @@ def delete_artifact(artifact_id):
         os.remove(filepath)
 
     conn.execute("DELETE FROM artifacts WHERE id = ?", (artifact_id,))
+    log_audit('deleted', 'artifact', artifact_id,
+              f"Deleted {row['original_name']} from {row['objective_id']}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -1181,6 +1253,8 @@ def update_artifact_domain(artifact_id):
     # Update DB
     conn.execute("UPDATE artifacts SET domain_id = ?, filename = ? WHERE id = ?",
                  (domain_id, new_filename, artifact_id))
+    log_audit('domain_changed', 'artifact', artifact_id,
+              f"Domain set to {domain_name or 'none'} for {row['objective_id']}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "filename": new_filename})
@@ -1192,6 +1266,8 @@ def update_artifact_obtained(artifact_id):
     method = data.get("obtained_method", "")
     conn = get_db()
     conn.execute("UPDATE artifacts SET obtained_method = ? WHERE id = ?", (method, artifact_id))
+    log_audit('obtained_updated', 'artifact', artifact_id,
+              f"Obtained method set to '{method}'" if method else "Obtained method cleared", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -1246,6 +1322,9 @@ def hash_artifacts():
         f.write(f"{'-'*12} {'-'*64} {'-'*4}\n")
         f.write(f"{'SHA256':<12} {log_hash:<64} CMMCAssessmentArtifacts.log\n")
 
+    log_audit('hash_generated', 'artifact', None,
+              f"Generated SHA-256 hashes for {len(results)} artifacts")
+
     return jsonify({
         "ok": True,
         "artifacts_hashed": len(results),
@@ -1293,6 +1372,17 @@ def setup():
             (display_name, 'admin', '', now)
         )
         conn.commit()
+        # Log after commit since user now exists — use manual insert since session isn't set yet
+        conn2 = get_db()
+        user_row = conn2.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        conn2.execute(
+            "INSERT INTO audit_log (user_id, username, action, target_type, target_id, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_row['id'], username, 'created', 'user', str(user_row['id']),
+             f"Initial admin user {first_name} {last_name} ({username}) created via setup",
+             datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+        conn2.commit()
+        conn2.close()
         conn.close()
         return redirect(url_for('login'))
     return render_template("setup.html", errors=[], username="")
@@ -1361,6 +1451,8 @@ def admin_create_user():
             "INSERT INTO team_members (name, role, email, created_at) VALUES (?, ?, ?, ?)",
             (display_name, role, '', now)
         )
+        log_audit('created', 'user', username,
+                  f"Created user {first_name} {last_name} ({username}) as {role}", conn=conn)
         conn.commit()
     except sqlite3.IntegrityError:
         conn.close()
@@ -1381,6 +1473,8 @@ def admin_delete_user(user_id):
     if user:
         conn.execute("DELETE FROM artifact_assignments WHERE member_id IN (SELECT id FROM team_members WHERE name = ?)", (user['username'],))
         conn.execute("DELETE FROM team_members WHERE name = ?", (user['username'],))
+    log_audit('deleted', 'user', user_id,
+              f"Deleted user {user['username']}" if user else f"Deleted user #{user_id}", conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -1395,11 +1489,62 @@ def admin_reset_password(user_id):
     if errors:
         return jsonify({"error": "; ".join(errors)}), 400
     conn = get_db()
+    user = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.execute("UPDATE users SET password_hash = ? WHERE id = ?",
                  (generate_password_hash(password), user_id))
+    log_audit('password_reset', 'user', user_id,
+              f"Password reset for {user['username']}" if user else f"Password reset for user #{user_id}",
+              conn=conn)
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+@app.route("/audit")
+@admin_required
+def audit_log_page():
+    page = request.args.get("page", 1, type=int)
+    per_page = 50
+    filter_user = request.args.get("user", "")
+    filter_action = request.args.get("action", "")
+    filter_from = request.args.get("from", "")
+    filter_to = request.args.get("to", "")
+
+    conn = get_db()
+    conditions = []
+    params = []
+    if filter_user:
+        conditions.append("username = ?")
+        params.append(filter_user)
+    if filter_action:
+        conditions.append("action = ?")
+        params.append(filter_action)
+    if filter_from:
+        conditions.append("timestamp >= ?")
+        params.append(filter_from + " 00:00:00")
+    if filter_to:
+        conditions.append("timestamp <= ?")
+        params.append(filter_to + " 23:59:59")
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+    total = conn.execute(f"SELECT COUNT(*) FROM audit_log {where}", params).fetchone()[0]
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = min(page, total_pages)
+    offset = (page - 1) * per_page
+
+    rows = conn.execute(
+        f"SELECT * FROM audit_log {where} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+        params + [per_page, offset]
+    ).fetchall()
+    users = conn.execute("SELECT DISTINCT username FROM audit_log WHERE username IS NOT NULL ORDER BY username").fetchall()
+    actions = conn.execute("SELECT DISTINCT action FROM audit_log ORDER BY action").fetchall()
+    conn.close()
+
+    return render_template("audit.html", logs=rows, page=page, total_pages=total_pages,
+                           total=total, users=[u[0] for u in users],
+                           actions=[a[0] for a in actions],
+                           filter_user=filter_user, filter_action=filter_action,
+                           filter_from=filter_from, filter_to=filter_to)
 
 
 if __name__ == "__main__":

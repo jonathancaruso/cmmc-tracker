@@ -92,7 +92,7 @@
                 {% if current_user and current_user.role == 'admin' %}<a href="/config" class="export-btn">⚙ Config</a>{% endif %}
                 <a href="/api/export" class="export-btn">⬇ Export CSV</a>
                 {% if current_user %}
-                {% if current_user.role == 'admin' %}<a href="/admin/users" class="export-btn">Users</a>{% endif %}
+                {% if current_user.role == 'admin' %}<a href="/admin/users" class="export-btn">Users</a><a href="/audit" class="export-btn">Audit Log</a>{% endif %}
                 <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
                 <a href="/logout" class="export-btn">Logout</a>
                 {% endif %}

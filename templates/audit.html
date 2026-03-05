@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Log | CMMC Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+
+        .section { background: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .section h2 { font-size: 1.125rem; margin-bottom: 1rem; }
+
+        .filters { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: end; margin-bottom: 1.25rem; }
+        .filters .field { display: flex; flex-direction: column; gap: 0.25rem; }
+        .filters label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+        .filters select, .filters input[type="date"] { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; }
+        .filters select:focus, .filters input:focus { border-color: var(--accent); outline: none; }
+        .filter-btn { background: var(--accent); color: var(--bg-primary); border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; align-self: end; }
+        .filter-btn:hover { opacity: 0.9; }
+        .clear-btn { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; cursor: pointer; align-self: end; text-decoration: none; }
+        .clear-btn:hover { background: var(--border); color: var(--text-primary); }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+        td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--bg-primary); font-size: 0.85rem; }
+        tr:hover td { background: var(--bg-hover); }
+
+        .action-tag { padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
+        .action-created { background: var(--success-bg); color: var(--success-text); }
+        .action-deleted { background: var(--danger-bg); color: var(--danger-text); }
+        .action-toggle, .action-status_change, .action-edited, .action-due_date_changed { background: var(--warning-bg); color: var(--warning-text); }
+        .action-uploaded { background: var(--purple-bg); color: var(--purple-text); }
+        .action-default { background: var(--border); color: var(--text-muted); }
+
+        .target-tag { color: var(--text-dim); font-size: 0.75rem; }
+        .timestamp { color: var(--text-dim); font-size: 0.8rem; white-space: nowrap; }
+        .details-text { color: var(--text-secondary); font-size: 0.825rem; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .details-text:hover { white-space: normal; word-break: break-word; }
+
+        .pagination { display: flex; gap: 0.5rem; align-items: center; justify-content: center; margin-top: 1.25rem; flex-wrap: wrap; }
+        .pagination a, .pagination span { padding: 0.4rem 0.75rem; border-radius: 0.375rem; font-size: 0.85rem; text-decoration: none; }
+        .pagination a { background: var(--bg-primary); color: var(--text-muted); border: 1px solid var(--border); }
+        .pagination a:hover { background: var(--border); color: var(--text-primary); }
+        .pagination .current { background: var(--accent); color: var(--bg-primary); font-weight: 600; }
+        .pagination .info { color: var(--text-dim); font-size: 0.8rem; }
+
+        .empty { text-align: center; padding: 3rem; color: var(--text-dim); }
+    </style>
+{% include "theme.html" %}
+</head>
+<body>
+    <div class="container">
+        {% include 'nav.html' %}
+        <div class="topnav">
+            <div class="topnav-left">
+                <a href="/" class="back" style="color:var(--text-muted);text-decoration:none;font-size:0.875rem;">&#8592; Dashboard</a>
+                <h1 style="font-size:1.3rem;margin:0;">Audit Log</h1>
+                <span style="color:var(--text-dim);font-size:0.8rem;margin-left:0.5rem;">({{ total }} entries)</span>
+            </div>
+            <div class="topnav-right">
+                {% if current_user %}
+                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
+                {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-btn" style="font-size:0.75rem;">Users</a>{% endif %}
+                <a href="/logout" class="nav-btn" style="font-size:0.75rem;">Logout</a>
+                {% endif %}
+                <div class="nav-search">
+                    <span class="icon">&#128269;</span>
+                    <input type="text" id="nav-si" placeholder="Search... ( / )" oninput="_debounceNav(this.value)" onfocus="if(this.value) _doNavSearch(this.value)" autocomplete="off">
+                    <div class="search-results" id="nav-sr"></div>
+                </div>
+                <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span>
+                <button class="theme-toggle nav-btn" onclick="toggleTheme()">&#9728;&#65039;</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <form class="filters" method="GET" action="/audit">
+                <div class="field">
+                    <label>User</label>
+                    <select name="user">
+                        <option value="">All Users</option>
+                        {% for u in users %}
+                        <option value="{{ u }}" {% if filter_user == u %}selected{% endif %}>{{ u }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Action</label>
+                    <select name="action">
+                        <option value="">All Actions</option>
+                        {% for a in actions %}
+                        <option value="{{ a }}" {% if filter_action == a %}selected{% endif %}>{{ a }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label>From</label>
+                    <input type="date" name="from" value="{{ filter_from }}">
+                </div>
+                <div class="field">
+                    <label>To</label>
+                    <input type="date" name="to" value="{{ filter_to }}">
+                </div>
+                <button type="submit" class="filter-btn">Filter</button>
+                <a href="/audit" class="clear-btn">Clear</a>
+            </form>
+        </div>
+
+        <div class="section">
+            {% if logs %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td><span class="timestamp">{{ log['timestamp'] }}</span></td>
+                        <td>{{ log['username'] or '—' }}</td>
+                        <td><span class="action-tag action-{{ log['action'] if log['action'] in ('created','deleted','toggle','status_change','edited','due_date_changed','uploaded') else 'default' }}">{{ log['action'] }}</span></td>
+                        <td>
+                            {% if log['target_type'] %}<span class="target-tag">{{ log['target_type'] }}</span>{% endif %}
+                            {% if log['target_id'] %}<span style="font-size:0.8rem;color:var(--link);">{{ log['target_id'] }}</span>{% endif %}
+                        </td>
+                        <td><span class="details-text" title="{{ log['details'] or '' }}">{{ log['details'] or '—' }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if total_pages > 1 %}
+            <div class="pagination">
+                <span class="info">Page {{ page }} of {{ total_pages }}</span>
+                {% if page > 1 %}
+                <a href="/audit?page=1&user={{ filter_user }}&action={{ filter_action }}&from={{ filter_from }}&to={{ filter_to }}">First</a>
+                <a href="/audit?page={{ page - 1 }}&user={{ filter_user }}&action={{ filter_action }}&from={{ filter_from }}&to={{ filter_to }}">Prev</a>
+                {% endif %}
+                {% for p in range([1, page - 2]|max, [total_pages, page + 2]|min + 1) %}
+                {% if p == page %}
+                <span class="current">{{ p }}</span>
+                {% else %}
+                <a href="/audit?page={{ p }}&user={{ filter_user }}&action={{ filter_action }}&from={{ filter_from }}&to={{ filter_to }}">{{ p }}</a>
+                {% endif %}
+                {% endfor %}
+                {% if page < total_pages %}
+                <a href="/audit?page={{ page + 1 }}&user={{ filter_user }}&action={{ filter_action }}&from={{ filter_from }}&to={{ filter_to }}">Next</a>
+                <a href="/audit?page={{ total_pages }}&user={{ filter_user }}&action={{ filter_action }}&from={{ filter_from }}&to={{ filter_to }}">Last</a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="empty">No audit log entries found.</div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
