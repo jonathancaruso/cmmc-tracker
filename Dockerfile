@@ -14,6 +14,6 @@ RUN mkdir -p /data/uploads
 ENV DB_PATH=/data/cmmc.db
 ENV UPLOAD_PATH=/data/uploads
 
-EXPOSE 8888
+EXPOSE 3300
 
 CMD ["python", "app.py"]

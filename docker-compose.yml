@@ -2,7 +2,7 @@ services:
   cmmc-tracker:
     build: .
     ports:
-      - "8888:8888"
+      - "3300:3300"
     volumes:
       - ./data:/data
     restart: unless-stopped
