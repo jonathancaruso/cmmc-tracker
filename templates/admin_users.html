@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users | CMMC Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+
+        .section { background: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .section h2 { font-size: 1.125rem; margin-bottom: 1rem; }
+
+        .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; align-items: end; }
+        .add-form .field { display: flex; flex-direction: column; gap: 0.25rem; }
+        .add-form label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+        .add-form input, .add-form select { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; }
+        .add-form input:focus, .add-form select:focus { border-color: var(--accent); outline: none; }
+        .add-form input[name="username"] { min-width: 150px; }
+        .add-form input[name="password"] { min-width: 200px; }
+        .add-btn { background: var(--accent); color: var(--bg-primary); border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; align-self: end; }
+        .add-btn:hover { opacity: 0.9; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+        td { padding: 0.75rem; border-bottom: 1px solid var(--bg-primary); font-size: 0.875rem; }
+        tr:hover td { background: var(--bg-hover); }
+        .role-tag { padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }
+        .role-admin { background: var(--purple-bg); color: var(--purple-text); }
+        .role-user { background: var(--border); color: var(--text-muted); }
+        .actions { display: flex; gap: 0.5rem; }
+        .action-btn { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer; }
+        .action-btn:hover { background: var(--border); color: var(--text-primary); }
+        .action-btn.danger:hover { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-bg); }
+        .date-text { color: var(--text-dim); font-size: 0.8rem; }
+        .pw-hint { color: var(--text-dim); font-size: 0.7rem; margin-top: 0.5rem; }
+        .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+        .toast.show { opacity: 1; }
+        .toast.error { background: var(--danger-bg); color: var(--danger-text); border: 1px solid #991b1b; }
+        .toast.success { background: var(--success-bg); color: var(--success-text); border: 1px solid #065f46; }
+    </style>
+{% include "theme.html" %}
+</head>
+<body>
+    <div class="container">
+        {% include 'nav.html' %}
+        <div class="topnav">
+            <div class="topnav-left">
+                <a href="/" class="back" style="color:var(--text-muted);text-decoration:none;font-size:0.875rem;">&#8592; Dashboard</a>
+                <h1 style="font-size:1.3rem;margin:0;">User Management</h1>
+            </div>
+            <div class="topnav-right">
+                {% if current_user %}
+                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.username }}</span>
+                <a href="/logout" class="nav-btn" style="font-size:0.75rem;">Logout</a>
+                {% endif %}
+                <div class="nav-search">
+                    <span class="icon">&#128269;</span>
+                    <input type="text" id="nav-si" placeholder="Search... ( / )" oninput="_debounceNav(this.value)" onfocus="if(this.value) _doNavSearch(this.value)" autocomplete="off">
+                    <div class="search-results" id="nav-sr"></div>
+                </div>
+                <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span>
+                <button class="theme-toggle nav-btn" onclick="toggleTheme()">&#9728;&#65039;</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Create User</h2>
+            <form class="add-form" onsubmit="createUser(event)">
+                <div class="field">
+                    <label>Username</label>
+                    <input type="text" name="username" required>
+                </div>
+                <div class="field">
+                    <label>Password</label>
+                    <input type="password" name="password" required>
+                </div>
+                <div class="field">
+                    <label>Role</label>
+                    <select name="role">
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <button type="submit" class="add-btn">+ Create User</button>
+            </form>
+            <div class="pw-hint">Min 16 chars, uppercase, lowercase, number, special character.</div>
+        </div>
+
+        <div class="section">
+            <h2>All Users</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr id="user-{{ u['id'] }}">
+                        <td style="font-weight:600;">{{ u['username'] }}</td>
+                        <td><span class="role-tag role-{{ u['role'] }}">{{ u['role'] }}</span></td>
+                        <td><span class="date-text">{{ u['created_at'] }}</span></td>
+                        <td>
+                            <div class="actions">
+                                <button class="action-btn" onclick="resetPassword({{ u['id'] }}, '{{ u['username'] }}')">Reset Password</button>
+                                <button class="action-btn danger" onclick="deleteUser({{ u['id'] }}, '{{ u['username'] }}')">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + type;
+        setTimeout(() => t.className = 'toast', 3000);
+    }
+
+    async function createUser(e) {
+        e.preventDefault();
+        const form = e.target;
+        const data = {
+            username: form.username.value.trim(),
+            password: form.password.value,
+            role: form.role.value
+        };
+        if (!data.username || !data.password) return;
+        const res = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (result.ok) {
+            location.reload();
+        } else {
+            showToast(result.error || 'Failed to create user', 'error');
+        }
+    }
+
+    async function deleteUser(id, name) {
+        if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+        const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (result.ok) {
+            location.reload();
+        } else {
+            showToast(result.error || 'Failed to delete user', 'error');
+        }
+    }
+
+    async function resetPassword(id, name) {
+        const pw = prompt(`Enter new password for "${name}":\n(Min 16 chars, uppercase, lowercase, number, special char)`);
+        if (!pw) return;
+        const res = await fetch(`/api/admin/users/${id}/reset`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ password: pw })
+        });
+        const result = await res.json();
+        if (result.ok) {
+            showToast('Password reset successfully', 'success');
+        } else {
+            showToast(result.error || 'Failed to reset password', 'error');
+        }
+    }
+    </script>
+</body>
+</html>

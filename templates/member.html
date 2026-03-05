@@ -59,6 +59,11 @@
                 <h1 style="font-size:1.3rem;margin:0;">👤 {{ member['name'] }} {% if member['role'] %}<span class="role" style="color:var(--text-muted);font-weight:400;font-size:0.9rem;">{{ member['role'] }}</span>{% endif %}</h1>
             </div>
             <div class="topnav-right">
+                {% if current_user %}
+                {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-btn" style="font-size:0.75rem;">Users</a>{% endif %}
+                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.username }}</span>
+                <a href="/logout" class="nav-btn" style="font-size:0.75rem;">Logout</a>
+                {% endif %}
                 <div class="nav-search">
                     <span class="icon">🔍</span>
                     <input type="text" id="nav-si" placeholder="Search... ( / )" oninput="_debounceNav(this.value)" onfocus="if(this.value) _doNavSearch(this.value)" autocomplete="off">

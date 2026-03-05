@@ -7,10 +7,14 @@ import sqlite3
 import csv
 import io
 from datetime import datetime
-from flask import Flask, render_template, jsonify, request, Response
+from flask import Flask, render_template, jsonify, request, Response, redirect, url_for, session
 from openpyxl import load_workbook
+import functools
+import secrets
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET") or secrets.token_hex(32)
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "cmmc.db"))
 XLSX_PATH = os.path.join(os.path.dirname(__file__), "nist-800-171a.xlsx")
 XLSX_171_PATH = os.path.join(os.path.dirname(__file__), "nist-800-171.xlsx")
@@ -86,6 +90,15 @@ def init_db():
             assigned_at TEXT NOT NULL,
             FOREIGN KEY (objective_id) REFERENCES objectives(id),
             FOREIGN KEY (member_id) REFERENCES team_members(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            created_at TEXT NOT NULL
         )
     """)
     conn.commit()
@@ -268,6 +281,72 @@ def init_db():
         print(f"Discussion and requirement types seeded from {XLSX_171_PATH}")
 
     conn.close()
+
+
+def validate_password(password):
+    errors = []
+    if len(password) < 16:
+        errors.append("Password must be at least 16 characters")
+    if not re.search(r'[A-Z]', password):
+        errors.append("Must contain an uppercase letter")
+    if not re.search(r'[a-z]', password):
+        errors.append("Must contain a lowercase letter")
+    if not re.search(r'[0-9]', password):
+        errors.append("Must contain a number")
+    if not re.search(r'[^A-Za-z0-9]', password):
+        errors.append("Must contain a special character")
+    return errors
+
+
+def admin_required(f):
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        user_id = session.get('user_id')
+        if not user_id:
+            return redirect(url_for('login'))
+        conn = get_db()
+        user = conn.execute("SELECT role FROM users WHERE id = ?", (user_id,)).fetchone()
+        conn.close()
+        if not user or user['role'] != 'admin':
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Admin access required"}), 403
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.before_request
+def check_auth():
+    if request.endpoint in ('static', None):
+        return
+    PUBLIC_ENDPOINTS = {'login', 'setup'}
+    conn = get_db()
+    user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    conn.close()
+    if user_count == 0:
+        if request.endpoint != 'setup':
+            return redirect(url_for('setup'))
+        return
+    if request.endpoint in PUBLIC_ENDPOINTS:
+        if 'user_id' in session:
+            return redirect(url_for('dashboard'))
+        return
+    if 'user_id' not in session:
+        if request.path.startswith('/api/') or request.path.startswith('/uploads/'):
+            return jsonify({"error": "Authentication required"}), 401
+        return redirect(url_for('login'))
+
+
+@app.context_processor
+def inject_user():
+    if 'user_id' in session:
+        conn = get_db()
+        user = conn.execute("SELECT id, username, role FROM users WHERE id = ?",
+                            (session['user_id'],)).fetchone()
+        conn.close()
+        if user:
+            return {'current_user': dict(user)}
+    return {'current_user': None}
 
 
 FAMILY_ABBR = {
@@ -543,6 +622,7 @@ def member_detail(member_id):
 ### Config / Team Management ###
 
 @app.route("/config")
+@admin_required
 def config_page():
     conn = get_db()
     members = conn.execute("SELECT * FROM team_members ORDER BY name").fetchall()
@@ -568,6 +648,7 @@ def list_team():
 
 
 @app.route("/api/team", methods=["POST"])
+@admin_required
 def add_team_member():
     data = request.json
     name = data.get("name", "").strip()
@@ -585,6 +666,7 @@ def add_team_member():
 
 
 @app.route("/api/team/<int:member_id>", methods=["DELETE"])
+@admin_required
 def delete_team_member(member_id):
     conn = get_db()
     conn.execute("DELETE FROM artifact_assignments WHERE member_id = ?", (member_id,))
@@ -595,6 +677,7 @@ def delete_team_member(member_id):
 
 
 @app.route("/api/team/<int:member_id>", methods=["PATCH"])
+@admin_required
 def update_team_member(member_id):
     data = request.json
     conn = get_db()
@@ -618,6 +701,7 @@ def list_domains():
 
 
 @app.route("/api/domains", methods=["POST"])
+@admin_required
 def add_domain():
     data = request.json
     name = data.get("name", "").strip()
@@ -636,6 +720,7 @@ def add_domain():
 
 
 @app.route("/api/domains/<int:domain_id>", methods=["PATCH"])
+@admin_required
 def update_domain(domain_id):
     data = request.json
     conn = get_db()
@@ -647,6 +732,7 @@ def update_domain(domain_id):
 
 
 @app.route("/api/domains/<int:domain_id>", methods=["DELETE"])
+@admin_required
 def delete_domain(domain_id):
     conn = get_db()
     conn.execute("UPDATE artifacts SET domain_id = NULL WHERE domain_id = ?", (domain_id,))
@@ -1043,6 +1129,143 @@ def hash_artifacts():
         "artifacts_log": "uploads/CMMCAssessmentArtifacts.log",
         "hash_log": "uploads/CMMCAssessmentLogHash.log"
     })
+
+
+### Authentication ###
+
+@app.route("/setup", methods=["GET", "POST"])
+def setup():
+    conn = get_db()
+    user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    conn.close()
+    if user_count > 0:
+        return redirect(url_for('login'))
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+        errors = []
+        if not username:
+            errors.append("Username is required")
+        if password != confirm:
+            errors.append("Passwords do not match")
+        errors.extend(validate_password(password))
+        if errors:
+            return render_template("setup.html", errors=errors, username=username)
+        conn = get_db()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute(
+            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+            (username, generate_password_hash(password), 'admin', now)
+        )
+        # Auto-create team member for assignment dropdown
+        conn.execute(
+            "INSERT INTO team_members (name, role, email, created_at) VALUES (?, ?, ?, ?)",
+            (username, 'admin', '', now)
+        )
+        conn.commit()
+        conn.close()
+        return redirect(url_for('login'))
+    return render_template("setup.html", errors=[], username="")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        conn = get_db()
+        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        conn.close()
+        if user and check_password_hash(user['password_hash'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['role'] = user['role']
+            return redirect(url_for('dashboard'))
+        return render_template("login.html", error="Invalid username or password")
+    return render_template("login.html", error=None)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route("/admin/users")
+@admin_required
+def admin_users():
+    conn = get_db()
+    users = conn.execute("SELECT id, username, role, created_at FROM users ORDER BY created_at").fetchall()
+    conn.close()
+    return render_template("admin_users.html", users=users)
+
+
+@app.route("/api/admin/users", methods=["POST"])
+@admin_required
+def admin_create_user():
+    data = request.json
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    role = data.get("role", "user")
+    if role not in ('admin', 'user'):
+        return jsonify({"error": "Invalid role"}), 400
+    if not username:
+        return jsonify({"error": "Username is required"}), 400
+    errors = validate_password(password)
+    if errors:
+        return jsonify({"error": "; ".join(errors)}), 400
+    conn = get_db()
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        conn.execute(
+            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
+            (username, generate_password_hash(password), role, now)
+        )
+        # Auto-create team member for assignment dropdown
+        conn.execute(
+            "INSERT INTO team_members (name, role, email, created_at) VALUES (?, ?, ?, ?)",
+            (username, role, '', now)
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "Username already exists"}), 409
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
+@admin_required
+def admin_delete_user(user_id):
+    if user_id == session.get('user_id'):
+        return jsonify({"error": "Cannot delete yourself"}), 400
+    conn = get_db()
+    user = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    # Also remove from team members
+    if user:
+        conn.execute("DELETE FROM artifact_assignments WHERE member_id IN (SELECT id FROM team_members WHERE name = ?)", (user['username'],))
+        conn.execute("DELETE FROM team_members WHERE name = ?", (user['username'],))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/users/<int:user_id>/reset", methods=["POST"])
+@admin_required
+def admin_reset_password(user_id):
+    data = request.json
+    password = data.get("password", "")
+    errors = validate_password(password)
+    if errors:
+        return jsonify({"error": "; ".join(errors)}), 400
+    conn = get_db()
+    conn.execute("UPDATE users SET password_hash = ? WHERE id = ?",
+                 (generate_password_hash(password), user_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

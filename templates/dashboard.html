@@ -88,8 +88,13 @@
                     <div class="search-results" id="search-results"></div>
                 </div>
                 <button class="export-btn" onclick="hashArtifacts(this)">🔒 Hash Artifacts</button>
-                <a href="/config" class="export-btn">⚙ Config</a>
+                {% if current_user and current_user.role == 'admin' %}<a href="/config" class="export-btn">⚙ Config</a>{% endif %}
                 <a href="/api/export" class="export-btn">⬇ Export CSV</a>
+                {% if current_user %}
+                {% if current_user.role == 'admin' %}<a href="/admin/users" class="export-btn">Users</a>{% endif %}
+                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.username }}</span>
+                <a href="/logout" class="export-btn">Logout</a>
+                {% endif %}
                 <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span>
                 <button class="theme-toggle export-btn" onclick="toggleTheme()">☀️</button>
             </div>

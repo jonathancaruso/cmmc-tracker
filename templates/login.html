@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | CMMC Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .login-card { background: var(--bg-secondary); border-radius: 0.75rem; padding: 2.5rem; width: 100%; max-width: 400px; margin: 1rem; }
+        .login-card h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+        .login-card .subtitle { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; color: var(--text-muted); font-size: 0.8rem; font-weight: 600; margin-bottom: 0.35rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .form-group input { width: 100%; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.6rem 0.75rem; border-radius: 0.375rem; font-size: 0.95rem; }
+        .form-group input:focus { border-color: var(--accent); outline: none; }
+        .submit-btn { width: 100%; background: var(--accent); color: var(--bg-primary); border: none; padding: 0.7rem; border-radius: 0.375rem; font-size: 0.95rem; font-weight: 600; cursor: pointer; margin-top: 0.5rem; }
+        .submit-btn:hover { opacity: 0.9; }
+        .error { background: var(--danger-bg); color: var(--danger-text); padding: 0.6rem 0.75rem; border-radius: 0.375rem; font-size: 0.85rem; margin-bottom: 1rem; }
+        .theme-bar { position: fixed; top: 1rem; right: 1rem; }
+    </style>
+{% include "theme.html" %}
+</head>
+<body>
+    <div class="theme-bar">
+        <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span>
+        <button class="theme-toggle" onclick="toggleTheme()">&#9728;&#65039;</button>
+    </div>
+    <div class="login-card">
+        <h1>CMMC Artifact Tracker</h1>
+        <div class="subtitle">Sign in to continue</div>
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+        <form method="POST" action="/login">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" required autofocus autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="submit-btn">Sign In</button>
+        </form>
+    </div>
+</body>
+</html>
