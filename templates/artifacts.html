@@ -13,7 +13,7 @@
         .search-bar input { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; width: 100%; max-width: 400px; }
         .search-bar input:focus { border-color: var(--accent); outline: none; }
 
-        table { width: 100%; border-collapse: collapse; background: var(--bg-secondary); border-radius: 0.75rem; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; background: var(--bg-secondary); border-radius: 0.75rem; overflow: visible; }
         thead th { background: var(--bg-tertiary); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; padding: 0.75rem 1rem; text-align: left; cursor: pointer; user-select: none; white-space: nowrap; }
         thead th:hover { color: var(--text-primary); }
         tbody td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; vertical-align: top; }
@@ -27,7 +27,7 @@
         .link-search { position: relative; display: inline-block; margin-top: 0.25rem; }
         .link-search input { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.65rem; width: 9rem; }
         .link-search input:focus { border-color: var(--accent); outline: none; }
-        .link-results { position: absolute; top: 100%; left: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.375rem; max-height: 180px; overflow-y: auto; z-index: 50; display: none; min-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .link-results { position: absolute; top: 100%; left: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.375rem; max-height: 180px; overflow-y: auto; z-index: 999; display: none; min-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
         .link-results.open { display: block; }
         .link-results .lr-item { padding: 0.3rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
         .link-results .lr-item:hover { background: var(--bg-hover); }
