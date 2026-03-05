@@ -57,6 +57,7 @@ def init_db():
             mime_type TEXT,
             uploaded_at TEXT NOT NULL,
             file_created TEXT,
+            obtained_method TEXT DEFAULT '',
             FOREIGN KEY (objective_id) REFERENCES objectives(id)
         )
     """)
@@ -125,6 +126,15 @@ def init_db():
     except Exception:
         try:
             conn.execute("ALTER TABLE artifacts ADD COLUMN file_created TEXT")
+        except Exception:
+            pass
+
+    # Migrate: add obtained_method to artifacts
+    try:
+        conn.execute("SELECT obtained_method FROM artifacts LIMIT 1")
+    except Exception:
+        try:
+            conn.execute("ALTER TABLE artifacts ADD COLUMN obtained_method TEXT DEFAULT ''")
         except Exception:
             pass
 
@@ -965,6 +975,17 @@ def update_artifact_domain(artifact_id):
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "filename": new_filename})
+
+
+@app.route("/api/artifacts/<int:artifact_id>/obtained", methods=["PATCH"])
+def update_artifact_obtained(artifact_id):
+    data = request.json
+    method = data.get("obtained_method", "")
+    conn = get_db()
+    conn.execute("UPDATE artifacts SET obtained_method = ? WHERE id = ?", (method, artifact_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
 
 
 @app.route("/uploads/<path:filename>")
