@@ -102,6 +102,14 @@
                     <div class="pct-label">{{ pct }}% complete</div>
                 </div>
             </div>
+            <div class="status-breakdown" style="display:flex;gap:1.5rem;margin-top:1rem;flex-wrap:wrap;">
+                {% set not_started = totals['total'] - (totals['captured'] or 0) - (totals['in_progress'] or 0) - (totals['evidence_collected'] or 0) - (totals['reviewed'] or 0) %}
+                <span style="font-size:0.8rem;color:#94a3b8;">⬜ Not Started: <strong style="color:#e2e8f0;">{{ not_started }}</strong></span>
+                <span style="font-size:0.8rem;color:#60a5fa;">🔵 In Progress: <strong>{{ totals['in_progress'] or 0 }}</strong></span>
+                <span style="font-size:0.8rem;color:#fbbf24;">🟡 Evidence Collected: <strong>{{ totals['evidence_collected'] or 0 }}</strong></span>
+                <span style="font-size:0.8rem;color:#a78bfa;">🟣 Reviewed: <strong>{{ totals['reviewed'] or 0 }}</strong></span>
+                <span style="font-size:0.8rem;color:#34d399;">🟢 Complete: <strong>{{ totals['captured'] or 0 }}</strong></span>
+            </div>
         </div>
         
         <div class="filter-bar">

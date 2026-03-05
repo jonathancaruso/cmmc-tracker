@@ -13,14 +13,14 @@
 - [x] No-artifact-no-checkmark enforcement
 - [x] CSV export with assigned-to column
 - [x] Toast notifications instead of popups
+- [x] Progress by person — member dashboard showing their assignments, completion %, what's pending
+- [x] Search — global search by objective ID, text, or family
+- [x] Due dates on assignments — date picker UI, highlight overdue in red
+- [x] Status workflow — Not Started → In Progress → Evidence Collected → Reviewed → Complete
 
 ## In Progress
-- [ ] Progress by person — member dashboard showing their assignments, completion %, what's pending
-- [ ] Search — global search by objective ID, text, or family
-- [ ] Due dates on assignments — date picker UI, highlight overdue in red
 
 ## Backlog (Priority Order)
-- [ ] Status workflow — Not Started → In Progress → Evidence Collected → Reviewed → Complete
 - [ ] Artifact count on dashboard cards (evidence attached vs total objectives)
 - [ ] POA&M generator — auto-generate Plan of Action & Milestones for incomplete objectives
 - [ ] Evidence mapping — link one artifact to multiple objectives

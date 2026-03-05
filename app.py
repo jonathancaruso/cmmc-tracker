@@ -90,6 +90,17 @@ def init_db():
                 conn.execute(f"ALTER TABLE objectives ADD COLUMN {col} TEXT DEFAULT ''")
             except Exception:
                 pass
+
+    # Add status column
+    try:
+        conn.execute("SELECT status FROM objectives LIMIT 1")
+    except Exception:
+        try:
+            conn.execute("ALTER TABLE objectives ADD COLUMN status TEXT DEFAULT 'Not Started'")
+            # Backfill: set captured objectives to 'Complete'
+            conn.execute("UPDATE objectives SET status = 'Complete' WHERE captured = 1")
+        except Exception:
+            pass
     conn.commit()
 
     # Check if objectives already seeded
@@ -252,12 +263,18 @@ def dashboard():
     families = conn.execute("""
         SELECT family, 
                COUNT(*) as total,
-               SUM(CASE WHEN captured = 1 THEN 1 ELSE 0 END) as captured
+               SUM(CASE WHEN captured = 1 THEN 1 ELSE 0 END) as captured,
+               SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
+               SUM(CASE WHEN status = 'Evidence Collected' THEN 1 ELSE 0 END) as evidence_collected,
+               SUM(CASE WHEN status = 'Reviewed' THEN 1 ELSE 0 END) as reviewed
         FROM objectives GROUP BY family ORDER BY family
     """).fetchall()
     totals = conn.execute("""
         SELECT COUNT(*) as total,
-               SUM(CASE WHEN captured = 1 THEN 1 ELSE 0 END) as captured
+               SUM(CASE WHEN captured = 1 THEN 1 ELSE 0 END) as captured,
+               SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
+               SUM(CASE WHEN status = 'Evidence Collected' THEN 1 ELSE 0 END) as evidence_collected,
+               SUM(CASE WHEN status = 'Reviewed' THEN 1 ELSE 0 END) as reviewed
         FROM objectives
     """).fetchone()
     conn.close()
@@ -301,15 +318,43 @@ def toggle_objective():
     obj_id = data.get("id")
     captured = data.get("captured", False)
     notes = data.get("artifact_notes", "")
+    status = "Complete" if captured else "Not Started"
     conn = get_db()
     now = datetime.now().strftime("%Y-%m-%d") if captured else None
     conn.execute("""
-        UPDATE objectives SET captured = ?, artifact_notes = ?, captured_date = ?
+        UPDATE objectives SET captured = ?, artifact_notes = ?, captured_date = ?, status = ?
         WHERE id = ?
-    """, (1 if captured else 0, notes, now, obj_id))
+    """, (1 if captured else 0, notes, now, status, obj_id))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+VALID_STATUSES = ["Not Started", "In Progress", "Evidence Collected", "Reviewed", "Complete"]
+
+
+@app.route("/api/status", methods=["POST"])
+def update_status():
+    data = request.json
+    obj_id = data.get("id")
+    status = data.get("status", "Not Started")
+    if status not in VALID_STATUSES:
+        return jsonify({"error": "Invalid status"}), 400
+    conn = get_db()
+    captured = 1 if status == "Complete" else 0
+    now = datetime.now().strftime("%Y-%m-%d") if captured else None
+    # Only set captured_date if transitioning to Complete
+    if captured:
+        existing = conn.execute("SELECT captured_date FROM objectives WHERE id = ?", (obj_id,)).fetchone()
+        if existing and existing["captured_date"]:
+            now = existing["captured_date"]  # Keep original date
+    conn.execute("""
+        UPDATE objectives SET status = ?, captured = ?, captured_date = COALESCE(?, captured_date)
+        WHERE id = ?
+    """, (status, captured, now, obj_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "status": status, "captured": captured})
 
 
 @app.route("/api/notes", methods=["POST"])
@@ -330,10 +375,11 @@ def bulk_update():
     captured = data.get("captured", True)
     conn = get_db()
     now = datetime.now().strftime("%Y-%m-%d") if captured else None
+    status = "Complete" if captured else "Not Started"
     conn.execute("""
-        UPDATE objectives SET captured = ?, captured_date = ?
+        UPDATE objectives SET captured = ?, captured_date = ?, status = ?
         WHERE requirement_id = ?
-    """, (1 if captured else 0, now, req_id))
+    """, (1 if captured else 0, now, status, req_id))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -354,12 +400,13 @@ def export_csv():
     conn.close()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID", "Family", "Requirement", "Objective", "Captured",
-                     "Notes", "Date Captured", "Assigned To"])
+    writer.writerow(["ID", "Family", "Requirement", "Objective", "Status",
+                     "Captured", "Notes", "Date Captured", "Assigned To"])
     for r in rows:
         assigned = "; ".join(assignments.get(r["id"], []))
         writer.writerow([r["id"], r["family"], r["requirement_id"],
                          r["assessment_objective"],
+                         r["status"] or "Not Started",
                          "Yes" if r["captured"] else "No",
                          r["artifact_notes"], r["captured_date"] or "",
                          assigned])
@@ -374,7 +421,7 @@ def api_search():
         return jsonify([])
     conn = get_db()
     results = conn.execute("""
-        SELECT id, family, requirement_id, assessment_objective, captured
+        SELECT id, family, requirement_id, assessment_objective, captured, status
         FROM objectives
         WHERE id LIKE ? OR assessment_objective LIKE ? 
               OR family LIKE ? OR requirement_id LIKE ?
