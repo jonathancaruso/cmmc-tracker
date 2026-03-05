@@ -99,7 +99,7 @@
                         <td><span class="count-tag">{{ counts.get(m['id'], 0) }} assigned</span></td>
                         <td>
                             <div class="actions">
-                                <button class="action-btn danger" onclick="deleteMember({{ m['id'] }}, '{{ m['name'] }}')">Delete</button>
+                                <button class="action-btn danger" onclick="deleteMember({{ m['id'] }}, {{ m['name']|tojson }})">Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -140,8 +140,8 @@
                         <td><span style="background:{{ d['color'] }};color:#fff;padding:0.15rem 0.5rem;border-radius:0.25rem;font-size:0.75rem;">{{ d['color'] }}</span></td>
                         <td>
                             <div class="actions">
-                                <button class="action-btn" onclick="editDomain({{ d['id'] }}, '{{ d['name'] }}', '{{ d['color'] }}')">Edit</button>
-                                <button class="action-btn danger" onclick="deleteDomain({{ d['id'] }}, '{{ d['name'] }}')">Delete</button>
+                                <button class="action-btn" onclick="editDomain({{ d['id'] }}, {{ d['name']|tojson }}, {{ d['color']|tojson }})">Edit</button>
+                                <button class="action-btn danger" onclick="deleteDomain({{ d['id'] }}, {{ d['name']|tojson }})">Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -174,9 +174,8 @@
             email: form.email.value.trim()
         };
         if (!data.name) return;
-        await fetch('/api/team', {
+        await _fetchJson('/api/team', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         });
         location.reload();
@@ -184,7 +183,7 @@
 
     async function deleteMember(id, name) {
         if (!confirm(`Delete ${name}? This will also remove all their assignments.`)) return;
-        await fetch(`/api/team/${id}`, { method: 'DELETE' });
+        await _fetchJson(`/api/team/${id}`, { method: 'DELETE' });
         location.reload();
     }
 
@@ -196,9 +195,8 @@
             color: form.color.value
         };
         if (!data.name) return;
-        await fetch('/api/domains', {
+        await _fetchJson('/api/domains', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         });
         location.reload();
@@ -209,9 +207,8 @@
         if (!newName) return;
         const newColor = prompt('Color (hex):', color);
         if (!newColor) return;
-        await fetch(`/api/domains/${id}`, {
+        await _fetchJson(`/api/domains/${id}`, {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({name: newName.trim(), color: newColor.trim()})
         });
         location.reload();
@@ -219,7 +216,7 @@
 
     async function deleteDomain(id, name) {
         if (!confirm(`Delete "${name}"? Artifacts will be untagged.`)) return;
-        await fetch(`/api/domains/${id}`, { method: 'DELETE' });
+        await _fetchJson(`/api/domains/${id}`, { method: 'DELETE' });
         location.reload();
     }
     </script>

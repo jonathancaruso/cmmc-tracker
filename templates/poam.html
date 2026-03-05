@@ -150,16 +150,16 @@
                     <td class="obj-text">{{ item['assessment_objective'][:120] }}{% if item['assessment_objective']|length > 120 %}...{% endif %}</td>
                     <td><span class="status-badge" style="background:var(--bg-secondary);color:var(--text-muted);">{{ item['status'] or 'Not Started' }}</span></td>
                     <td>
-                        <select class="inline-input" style="width:90px;" onchange="savePoam('{{ item['id'] }}', this.closest('tr'))">
+                        <select class="inline-input" style="width:90px;" onchange="savePoam({{ item['id']|tojson }}, this.closest('tr'))">
                             <option value="High" {% if item['risk_level'] == 'High' %}selected{% endif %}>High</option>
                             <option value="Moderate" {% if (item['risk_level'] or 'Moderate') == 'Moderate' %}selected{% endif %}>Moderate</option>
                             <option value="Low" {% if item['risk_level'] == 'Low' %}selected{% endif %}>Low</option>
                         </select>
                     </td>
-                    <td><textarea class="inline-input" placeholder="Describe weakness..." onchange="savePoam('{{ item['id'] }}', this.closest('tr'))">{{ item['weakness'] or '' }}</textarea></td>
-                    <td><textarea class="inline-input" placeholder="Remediation steps..." onchange="savePoam('{{ item['id'] }}', this.closest('tr'))">{{ item['remediation'] or '' }}</textarea></td>
-                    <td><input class="inline-input" placeholder="Resources..." value="{{ item['resources'] or '' }}" onchange="savePoam('{{ item['id'] }}', this.closest('tr'))"></td>
-                    <td><input type="date" class="inline-input" style="width:130px;" value="{{ item['milestone_date'] or '' }}" onchange="savePoam('{{ item['id'] }}', this.closest('tr'))"></td>
+                    <td><textarea class="inline-input" placeholder="Describe weakness..." onchange="savePoam({{ item['id']|tojson }}, this.closest('tr'))">{{ item['weakness'] or '' }}</textarea></td>
+                    <td><textarea class="inline-input" placeholder="Remediation steps..." onchange="savePoam({{ item['id']|tojson }}, this.closest('tr'))">{{ item['remediation'] or '' }}</textarea></td>
+                    <td><input class="inline-input" placeholder="Resources..." value="{{ item['resources'] or '' }}" onchange="savePoam({{ item['id']|tojson }}, this.closest('tr'))"></td>
+                    <td><input type="date" class="inline-input" style="width:130px;" value="{{ item['milestone_date'] or '' }}" onchange="savePoam({{ item['id']|tojson }}, this.closest('tr'))"></td>
                     <td style="font-size:0.7rem;color:var(--text-muted);">{{ item['assigned_to'] or 'Unassigned' }}</td>
                     <td><span class="save-indicator" id="saved-{{ loop.index }}">✓</span></td>
                 </tr>
@@ -196,9 +196,8 @@
         row.dataset.hasPlan = data.remediation ? '1' : '0';
 
         try {
-            const res = await fetch('/api/poam', {
+            const res = await _fetchJson('/api/poam', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
             if (res.ok) {

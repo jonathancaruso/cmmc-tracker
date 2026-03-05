@@ -38,7 +38,7 @@ async function _doNavSearch(q) {
     if (!results.length) { c.innerHTML = '<div class="sr-empty">No results</div>'; }
     else { c.innerHTML = results.slice(0,12).map(r => {
         const reqId = r.requirement_id.replace(/\./g, '-');
-        return `<a href="/family/${encodeURIComponent(r.family)}#req-${reqId}" class="sr-item" onclick="sessionStorage.setItem('openReq','req-${reqId}')"><span class="sr-id">${r.id}</span><span class="sr-text">${r.assessment_objective}<div class="sr-family">${r.family}</div></span><span class="sr-status ${r.captured?'sr-captured':'sr-pending'}">${r.captured?'CAPTURED':'PENDING'}</span></a>`;
+        return `<a href="/family/${encodeURIComponent(r.family)}#req-${encodeURIComponent(reqId)}" class="sr-item" onclick="sessionStorage.setItem('openReq',${JSON.stringify('req-'+reqId)})"><span class="sr-id">${escapeHtml(r.id)}</span><span class="sr-text">${escapeHtml(r.assessment_objective)}<div class="sr-family">${escapeHtml(r.family)}</div></span><span class="sr-status ${r.captured?'sr-captured':'sr-pending'}">${r.captured?'CAPTURED':'PENDING'}</span></a>`;
     }).join(''); }
     c.classList.add('open');
 }

@@ -187,11 +187,11 @@
         } else {
             container.innerHTML = results.slice(0, 15).map(r => {
                 const reqId = r.requirement_id.replace(/\./g, '-');
-                return `<a href="/family/${encodeURIComponent(r.family)}#req-${reqId}" onclick="sessionStorage.setItem('openReq','req-${reqId}')" class="sr-item" style="text-decoration:none;color:inherit;">
-                    <span class="sr-id">${r.id}</span>
+                return `<a href="/family/${encodeURIComponent(r.family)}#req-${encodeURIComponent(reqId)}" onclick="sessionStorage.setItem('openReq',${JSON.stringify('req-'+reqId)})" class="sr-item" style="text-decoration:none;color:inherit;">
+                    <span class="sr-id">${escapeHtml(r.id)}</span>
                     <span class="sr-text">
-                        ${r.assessment_objective}
-                        <div class="sr-family">${r.family} · ${r.requirement_id}</div>
+                        ${escapeHtml(r.assessment_objective)}
+                        <div class="sr-family">${escapeHtml(r.family)} · ${escapeHtml(r.requirement_id)}</div>
                     </span>
                     <span class="sr-status ${r.captured ? 'sr-captured' : 'sr-pending'}">${r.captured ? 'CAPTURED' : 'PENDING'}</span>
                 </a>`;
@@ -229,7 +229,7 @@
         btn.disabled = true;
         btn.textContent = '⏳ Hashing...';
         try {
-            const res = await fetch('/api/hash-artifacts', { method: 'POST' });
+            const res = await _fetchJson('/api/hash-artifacts', { method: 'POST' });
             const data = await res.json();
             if (data.ok) {
                 document.getElementById('hash-count').textContent = data.artifacts_hashed;

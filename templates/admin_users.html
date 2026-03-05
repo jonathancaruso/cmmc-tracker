@@ -139,14 +139,14 @@
                                 </span>
                                 <span class="edit-mode-{{ u['id'] }}" style="display:none;">
                                     <button class="action-btn" style="background:var(--success-bg);color:var(--success-text);border-color:var(--success-bg);" onclick="saveEdit({{ u['id'] }})">Save</button>
-                                    <button class="action-btn" onclick="cancelEdit({{ u['id'] }}, '{{ u['first_name'] }}', '{{ u['last_name'] }}', '{{ u['role'] }}')">Cancel</button>
+                                    <button class="action-btn" onclick="cancelEdit({{ u['id'] }}, {{ u['first_name']|tojson }}, {{ u['last_name']|tojson }}, {{ u['role']|tojson }})">Cancel</button>
                                 </span>
                                 <span class="pw-mode-{{ u['id'] }}" style="display:none;">
                                     <input type="password" id="edit-pw-{{ u['id'] }}" placeholder="New password (16+ chars)" style="width:12rem;padding:0.2rem 0.4rem;font-size:0.8rem;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-primary);border-radius:0.25rem;">
                                     <button class="action-btn" style="background:var(--success-bg);color:var(--success-text);border-color:var(--success-bg);" onclick="savePassword({{ u['id'] }})">Save</button>
                                     <button class="action-btn" onclick="cancelPw({{ u['id'] }})">Cancel</button>
                                 </span>
-                                <button class="action-btn danger" onclick="deleteUser({{ u['id'] }}, '{{ u['username'] }}')">Delete</button>
+                                <button class="action-btn danger" onclick="deleteUser({{ u['id'] }}, {{ u['username']|tojson }})">Delete</button>
                             </div>
                         </td>
                     </tr>
@@ -177,9 +177,8 @@
             role: form.role.value
         };
         if (!data.username || !data.password) return;
-        const res = await fetch('/api/admin/users', {
+        const res = await _fetchJson('/api/admin/users', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(data)
         });
         const result = await res.json();
@@ -206,9 +205,8 @@
         const ln = document.getElementById(`edit-ln-${id}`).value.trim();
         const role = document.getElementById(`edit-role-${id}`).value;
         if (!fn || !ln) { showToast('First and last name required', 'error'); return; }
-        const res = await fetch(`/api/admin/users/${id}`, {
+        const res = await _fetchJson(`/api/admin/users/${id}`, {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ first_name: fn, last_name: ln, role: role })
         });
         const result = await res.json();
@@ -227,9 +225,8 @@
     async function savePassword(id) {
         const pw = document.getElementById(`edit-pw-${id}`).value;
         if (!pw) { showToast('Enter a password', 'error'); return; }
-        const res = await fetch(`/api/admin/users/${id}/reset`, {
+        const res = await _fetchJson(`/api/admin/users/${id}/reset`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ password: pw })
         });
         const result = await res.json();
@@ -239,7 +236,7 @@
 
     async function deleteUser(id, name) {
         if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
-        const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+        const res = await _fetchJson(`/api/admin/users/${id}`, { method: 'DELETE' });
         const result = await res.json();
         if (result.ok) {
             location.reload();

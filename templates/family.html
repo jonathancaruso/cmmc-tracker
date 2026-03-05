@@ -154,11 +154,11 @@
                 <div class="bulk-bar">
                     <span style="font-size:0.8rem;color:var(--text-dim)">{{ req['objectives'] | length }} objectives</span>
                     <div style="display:flex;gap:0.5rem;align-items:center;">
-                        <select class="bulk-assign-select" data-req-id="{{ req_id }}" onchange="bulkAssign(this, '{{ req_id }}')" style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);padding:0.3rem 0.5rem;border-radius:0.375rem;font-size:0.75rem;cursor:pointer;">
+                        <select class="bulk-assign-select" data-req-id="{{ req_id }}" onchange="bulkAssign(this, {{ req_id|tojson }})" style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);padding:0.3rem 0.5rem;border-radius:0.375rem;font-size:0.75rem;cursor:pointer;">
                             <option value="">Assign all to...</option>
                         </select>
-                        <button class="bulk-btn" onclick="bulkMark('{{ req_id }}', true, this)">✓ Mark All Complete</button>
-                        <button class="bulk-btn" onclick="bulkMark('{{ req_id }}', false, this)">✗ Clear All</button>
+                        <button class="bulk-btn" onclick="bulkMark({{ req_id|tojson }}, true, this)">✓ Mark All Complete</button>
+                        <button class="bulk-btn" onclick="bulkMark({{ req_id|tojson }}, false, this)">✗ Clear All</button>
                     </div>
                 </div>
 
@@ -191,7 +191,7 @@
                 <div class="objective" id="obj-{{ obj['id'] | replace('[', '') | replace(']', '') | replace('.', '-') | replace(' ', '') }}">
                     <div class="obj-check">
                         <select class="status-select st-{{ (obj.get('status') or 'Not Started') | lower | replace(' ', '-') }}"
-                                onchange="setStatus('{{ obj['id'] }}', this.value, this)"
+                                onchange="setStatus({{ obj['id']|tojson }}, this.value, this)"
                                 data-obj-id="{{ obj['id'] }}">
                             <option value="Not Started" {{ 'selected' if not obj.get('status') or obj['status'] == 'Not Started' }}>Not Started</option>
                             <option value="In Progress" {{ 'selected' if obj.get('status') == 'In Progress' }}>In Progress</option>
@@ -207,7 +207,7 @@
                         <div class="obj-meta">
                             <input type="text" class="obj-notes" placeholder="Artifact notes..."
                                    value="{{ obj['artifact_notes'] or '' }}"
-                                   onblur="saveNotes('{{ obj['id'] }}', this.value)">
+                                   onblur="saveNotes({{ obj['id']|tojson }}, this.value)">
                             {% if obj['captured_date'] %}
                             <span class="obj-date">{{ obj['captured_date'] }}</span>
                             {% endif %}
@@ -228,7 +228,7 @@
                         {% endif %}
                         <div class="obj-assignments" data-obj-id="{{ obj['id'] }}">
                             <span class="assign-tags" data-obj-id="{{ obj['id'] }}"></span>
-                            <select class="assign-select" onchange="assignMember(this, '{{ obj['id'] }}')">
+                            <select class="assign-select" onchange="assignMember(this, {{ obj['id']|tojson }})">
                                 <option value="">+ Assign...</option>
                             </select>
                         </div>
@@ -241,7 +241,7 @@
                                 <label class="upload-btn">
                                     📎 Attach File
                                     <input type="file" name="file" style="display:none"
-                                           onchange="handleFileSelect(this, '{{ obj['id'] }}')">
+                                           onchange="handleFileSelect(this, {{ obj['id']|tojson }})">
                                 </label>
                             </div>
                         </div>
@@ -279,7 +279,6 @@
 
     async function setStatus(id, status, selectEl) {
         if (status === 'Complete') {
-            // Check if there are artifacts attached
             const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}`);
             const artifacts = await res.json();
             if (artifacts.length === 0) {
@@ -288,9 +287,8 @@
                 return;
             }
         }
-        await fetch('/api/status', {
+        await _fetchJson('/api/status', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({id, status})
         });
         // Update select styling
@@ -318,18 +316,16 @@
     }
 
     async function saveNotes(id, notes) {
-        await fetch('/api/notes', {
+        await _fetchJson('/api/notes', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({id, notes})
         });
     }
 
     async function bulkMark(requirementId, captured, btn) {
         btn.disabled = true;
-        await fetch('/api/bulk', {
+        await _fetchJson('/api/bulk', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({requirement_id: requirementId, captured})
         });
         location.reload();
@@ -353,44 +349,46 @@
         const res = await fetch(`/api/artifacts/${encodeURIComponent(objId)}`);
         const artifacts = await res.json();
         container.innerHTML = artifacts.map(a => {
-            const displayName = a.filename.split('/').pop();
+            const displayName = escapeHtml(a.filename.split('/').pop());
             const meta = [];
             if (a.file_size) meta.push(formatSize(a.file_size));
-            if (a.uploaded_at) meta.push('uploaded ' + a.uploaded_at);
-            if (a.file_created) meta.push('created ' + a.file_created);
+            if (a.uploaded_at) meta.push('uploaded ' + escapeHtml(a.uploaded_at));
+            if (a.file_created) meta.push('created ' + escapeHtml(a.file_created));
             const isLinked = a.is_linked;
+            const safeObjId = JSON.stringify(objId);
             const linkedBadges = (a.linked_objectives || [])
                 .filter(lo => lo.id !== objId)
-                .map(lo => `<span class="linked-badge">${lo.id}<span class="unlink-btn" onclick="unlinkArtifact(${a.id}, '${lo.id}', '${objId}')" title="Unlink from ${lo.id}">✕</span></span>`)
+                .map(lo => `<span class="linked-badge">${escapeHtml(lo.id)}<span class="unlink-btn" onclick="unlinkArtifact(${parseInt(a.id)}, ${JSON.stringify(lo.id)}, ${safeObjId})" title="Unlink from ${escapeHtml(lo.id)}">✕</span></span>`)
                 .join('');
+            const safeFilename = encodeURIComponent(a.filename).replace(/%2F/g, '/');
             return `
             <span class="artifact-item" style="flex-direction:column;align-items:flex-start;padding:0.35rem 0.5rem;">
                 <span style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;">
-                    ${isImage(a.original_name) ? `<img src="/uploads/${a.filename}" class="preview">` : ''}
+                    ${isImage(a.original_name) ? `<img src="/uploads/${safeFilename}" class="preview">` : ''}
                     ${isLinked ? '<span class="is-linked-tag">LINKED</span>' : ''}
-                    <a href="/uploads/${a.filename}" target="_blank" style="font-weight:600;">${displayName}</a>
-                    <select class="domain-select" style="font-size:0.65rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:0.25rem;color:var(--text-primary);padding:0.1rem 0.2rem;" onchange="updateArtifactDomain(${a.id}, this.value, '${objId}')">
+                    <a href="/uploads/${safeFilename}" target="_blank" style="font-weight:600;">${displayName}</a>
+                    <select class="domain-select" style="font-size:0.65rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:0.25rem;color:var(--text-primary);padding:0.1rem 0.2rem;" onchange="updateArtifactDomain(${parseInt(a.id)}, this.value, ${safeObjId})">
                         <option value="">No tag</option>
-                        ${domainCache.map(d => `<option value="${d.id}" ${a.domain_id == d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
+                        ${domainCache.map(d => `<option value="${parseInt(d.id)}" ${a.domain_id == d.id ? 'selected' : ''}>${escapeHtml(d.name)}</option>`).join('')}
                     </select>
                     ${isLinked
-                        ? `<span class="delete-artifact" onclick="unlinkArtifact(${a.id}, '${objId}', '${objId}')" title="Unlink from this objective">✕</span>`
-                        : `<span class="delete-artifact" onclick="deleteArtifact(${a.id}, '${objId}')" title="Delete">✕</span>`
+                        ? `<span class="delete-artifact" onclick="unlinkArtifact(${parseInt(a.id)}, ${safeObjId}, ${safeObjId})" title="Unlink from this objective">✕</span>`
+                        : `<span class="delete-artifact" onclick="deleteArtifact(${parseInt(a.id)}, ${safeObjId})" title="Delete">✕</span>`
                     }
                 </span>
                 <span style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;margin-top:0.15rem;">
                     ${linkedBadges}
-                    <span class="link-search" data-artifact-id="${a.id}" data-obj-id="${objId}">
-                        <input type="text" placeholder="+ Link objective..." oninput="searchObjectivesForLink(this, ${a.id}, '${objId}')" onfocus="if(this.value)searchObjectivesForLink(this, ${a.id}, '${objId}')">
+                    <span class="link-search" data-artifact-id="${parseInt(a.id)}" data-obj-id="${escapeHtml(objId)}">
+                        <input type="text" placeholder="+ Link objective..." oninput="searchObjectivesForLink(this, ${parseInt(a.id)}, ${safeObjId})" onfocus="if(this.value)searchObjectivesForLink(this, ${parseInt(a.id)}, ${safeObjId})">
                         <div class="link-results"></div>
                     </span>
                 </span>
                 <span style="color:var(--text-dim);font-size:0.65rem;">
-                    ${a.original_name !== displayName ? `orig: ${a.original_name} · ` : ''}${meta.join(' · ')}
+                    ${a.original_name !== a.filename.split('/').pop() ? `orig: ${escapeHtml(a.original_name)} · ` : ''}${meta.join(' · ')}
                 </span>
                 <input type="text" class="obj-notes" placeholder="How was this obtained?"
-                       value="${(a.obtained_method || '').replace(/"/g, '&quot;')}"
-                       onblur="saveObtained(${a.id}, this.value)"
+                       value="${escapeHtml(a.obtained_method || '')}"
+                       onblur="saveObtained(${parseInt(a.id)}, this.value)"
                        style="width:100%;margin-top:0.2rem;font-size:0.65rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:0.25rem;color:var(--text-primary);padding:0.2rem 0.4rem;">
             </span>`;
         }).join('');
@@ -408,7 +406,7 @@
         if (domainId) fd.append('domain_id', domainId);
 
         try {
-            const res = await fetch('/api/upload', { method: 'POST', body: fd });
+            const res = await _fetchForm('/api/upload', fd);
             const data = await res.json();
             if (data.ok) {
                 input.value = '';
@@ -423,7 +421,7 @@
 
     async function deleteArtifact(id, objId) {
         if (!confirm('Delete this artifact?')) return;
-        await fetch(`/api/artifacts/delete/${id}`, { method: 'POST' });
+        await _fetchJson(`/api/artifacts/delete/${id}`, { method: 'POST' });
         loadArtifacts(objId);
     }
 
@@ -432,7 +430,7 @@
     async function loadTeam() {
         const res = await fetch('/api/team');
         teamMembers = await res.json();
-        const opts = teamMembers.map(m => `<option value="${m.id}">${m.name}${m.role ? ' ('+m.role+')' : ''}</option>`).join('');
+        const opts = teamMembers.map(m => `<option value="${parseInt(m.id)}">${escapeHtml(m.name)}${m.role ? ' ('+escapeHtml(m.role)+')' : ''}</option>`).join('');
         // Populate per-objective dropdowns
         document.querySelectorAll('.assign-select').forEach(sel => {
             sel.innerHTML = '<option value="">+ Assign...</option>' + opts;
@@ -449,7 +447,7 @@
     async function loadDomains() {
         const res = await fetch('/api/domains');
         domainCache = await res.json();
-        const opts = domainCache.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+        const opts = domainCache.map(d => `<option value="${parseInt(d.id)}">${escapeHtml(d.name)}</option>`).join('');
         document.querySelectorAll('.upload-form .domain-select').forEach(sel => {
             sel.innerHTML = '<option value="">No domain/asset</option>' + opts;
         });
@@ -458,17 +456,15 @@
     const domainsReady = loadDomains();
 
     async function saveObtained(artifactId, value) {
-        await fetch(`/api/artifacts/${artifactId}/obtained`, {
+        await _fetchJson(`/api/artifacts/${artifactId}/obtained`, {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ obtained_method: value })
         });
     }
 
     async function updateArtifactDomain(artifactId, domainId, objId) {
-        await fetch(`/api/artifacts/${artifactId}/domain`, {
+        await _fetchJson(`/api/artifacts/${artifactId}/domain`, {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ domain_id: domainId || null })
         });
         loadArtifacts(objId);
@@ -478,9 +474,8 @@
         const memberId = select.value;
         if (!memberId) return;
         const memberName = select.options[select.selectedIndex].text;
-        const res = await fetch('/api/assignments/bulk', {
+        const res = await _fetchJson('/api/assignments/bulk', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({requirement_id: reqId, member_id: parseInt(memberId)})
         });
         const data = await res.json();
@@ -499,14 +494,15 @@
         const res = await fetch(`/api/assignments/${encodeURIComponent(objId)}`);
         const assignments = await res.json();
         const today = new Date().toISOString().split('T')[0];
+        const safeObjId = JSON.stringify(objId);
         container.innerHTML = assignments.map(a => {
             const overdue = a.due_date && a.due_date < today ? 'overdue' : '';
             return `<span class="assign-tag">
-                👤 ${a.member_name}
-                <input type="date" class="due-input" value="${a.due_date || ''}"
-                       onchange="setDueDate(${a.id}, this.value, '${objId}')" title="Due date">
+                ${escapeHtml(a.member_name)}
+                <input type="date" class="due-input" value="${escapeHtml(a.due_date || '')}"
+                       onchange="setDueDate(${parseInt(a.id)}, this.value, ${safeObjId})" title="Due date">
                 ${a.due_date && overdue ? '<span class="due overdue">OVERDUE</span>' : ''}
-                <span class="remove-assign" onclick="removeAssignment(${a.id}, '${objId}')" title="Remove">✕</span>
+                <span class="remove-assign" onclick="removeAssignment(${parseInt(a.id)}, ${safeObjId})" title="Remove">✕</span>
             </span>`;
         }).join('');
     }
@@ -514,9 +510,8 @@
     async function assignMember(select, objId) {
         const memberId = select.value;
         if (!memberId) return;
-        await fetch('/api/assignments', {
+        await _fetchJson('/api/assignments', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({objective_id: objId, member_id: parseInt(memberId)})
         });
         select.value = '';
@@ -524,14 +519,13 @@
     }
 
     async function removeAssignment(id, objId) {
-        await fetch(`/api/assignments/${id}`, { method: 'DELETE' });
+        await _fetchJson(`/api/assignments/${id}`, { method: 'DELETE' });
         loadAssignments(objId);
     }
 
     async function setDueDate(assignmentId, date, objId) {
-        await fetch(`/api/assignments/${assignmentId}/due`, {
+        await _fetchJson(`/api/assignments/${assignmentId}/due`, {
             method: 'PATCH',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({due_date: date})
         });
         loadAssignments(objId);
@@ -550,8 +544,8 @@
                 resultsDiv.innerHTML = '<div class="lr-item" style="color:var(--text-dim)">No matches</div>';
             } else {
                 resultsDiv.innerHTML = results.slice(0, 8).map(r =>
-                    `<div class="lr-item" onclick="doLinkArtifact(${artifactId}, '${r.id}', '${currentObjId}', this.closest('.link-search').querySelector('input'))">
-                        <strong style="color:var(--link)">${r.id}</strong> — ${r.family}
+                    `<div class="lr-item" onclick="doLinkArtifact(${parseInt(artifactId)}, ${JSON.stringify(r.id)}, ${JSON.stringify(currentObjId)}, this.closest('.link-search').querySelector('input'))">
+                        <strong style="color:var(--link)">${escapeHtml(r.id)}</strong> — ${escapeHtml(r.family)}
                     </div>`
                 ).join('');
             }
@@ -566,9 +560,8 @@
     }
 
     async function doLinkArtifact(artifactId, objectiveId, currentObjId, input) {
-        const res = await fetch(`/api/artifacts/${artifactId}/link`, {
+        const res = await _fetchJson(`/api/artifacts/${artifactId}/link`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({objective_id: objectiveId})
         });
         const data = await res.json();
@@ -579,7 +572,7 @@
     }
 
     async function unlinkArtifact(artifactId, objectiveId, currentObjId) {
-        const res = await fetch(`/api/artifacts/${artifactId}/link/${encodeURIComponent(objectiveId)}`, { method: 'DELETE' });
+        const res = await _fetchJson(`/api/artifacts/${artifactId}/link/${encodeURIComponent(objectiveId)}`, { method: 'DELETE' });
         const data = await res.json();
         if (data.error) { showToast(data.error); return; }
         refreshAllVisibleArtifacts();

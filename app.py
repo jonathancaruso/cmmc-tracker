@@ -6,15 +6,33 @@ import re
 import sqlite3
 import csv
 import io
+import time
+import collections
 from datetime import datetime
-from flask import Flask, render_template, jsonify, request, Response, redirect, url_for, session
+from flask import Flask, render_template, jsonify, request, Response, redirect, url_for, session, abort
 from openpyxl import load_workbook
 import functools
 import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET") or secrets.token_hex(32)
+
+# --- Secret key: prefer env var; fallback generates random (invalidates sessions on restart) ---
+_secret = os.environ.get("FLASK_SECRET")
+if not _secret:
+    _secret = secrets.token_hex(32)
+    import sys
+    print("WARNING: FLASK_SECRET not set. Using random key — sessions will not survive restarts. "
+          "Set FLASK_SECRET env var for production.", file=sys.stderr)
+app.secret_key = _secret
+
+# --- Session / cookie security ---
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get("FLASK_ENV") == "production"
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB upload limit
+
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(__file__), "cmmc.db"))
 XLSX_PATH = os.path.join(os.path.dirname(__file__), "nist-800-171a.xlsx")
 XLSX_171_PATH = os.path.join(os.path.dirname(__file__), "nist-800-171.xlsx")
@@ -22,6 +40,20 @@ UPLOAD_DIR = os.environ.get("UPLOAD_PATH", os.path.join(os.path.dirname(__file__
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 ALLOWED_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.pdf', '.doc', '.docx',
                       '.xls', '.xlsx', '.txt', '.csv', '.pptx', '.zip', '.md'}
+
+
+# --- Rate limiting for login ---
+_login_attempts = collections.defaultdict(list)  # ip -> [timestamp, ...]
+LOGIN_RATE_LIMIT = 5       # max attempts
+LOGIN_RATE_WINDOW = 300    # per 5 minutes
+
+def _check_rate_limit(ip):
+    now = time.time()
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < LOGIN_RATE_WINDOW]
+    if len(_login_attempts[ip]) >= LOGIN_RATE_LIMIT:
+        return False
+    _login_attempts[ip].append(now)
+    return True
 
 
 def get_db():
@@ -408,6 +440,82 @@ def check_auth():
         if request.path.startswith('/api/') or request.path.startswith('/uploads/'):
             return jsonify({"error": "Authentication required"}), 401
         return redirect(url_for('login'))
+
+
+# --- CSRF protection ---
+@app.before_request
+def csrf_protect():
+    if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        return
+    if request.endpoint in ('static', None):
+        return
+    # Exempt logout (GET-based, session is cleared)
+    if request.endpoint == 'logout':
+        return
+    # Form-based endpoints: validate CSRF from form field
+    if request.endpoint in ('login', 'setup'):
+        token = request.form.get('csrf_token', '')
+        if not token or token != session.get('csrf_token'):
+            if request.endpoint == 'login':
+                return render_template("login.html", error="Session expired. Please try again.")
+            abort(403)
+        return
+    # For API endpoints, validate CSRF header (also check form field for multipart uploads)
+    token = request.headers.get('X-CSRF-Token', '') or request.form.get('csrf_token', '')
+    if not token or token != session.get('csrf_token'):
+        return jsonify({"error": "CSRF token missing or invalid"}), 403
+
+
+def generate_csrf_token():
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_hex(32)
+    return session['csrf_token']
+
+
+@app.context_processor
+def inject_csrf():
+    return {'csrf_token': generate_csrf_token}
+
+
+# --- Security headers ---
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none';"
+    )
+    if os.environ.get("FLASK_ENV") == "production":
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
+
+# --- Error handlers ---
+@app.errorhandler(404)
+def not_found(e):
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Not found"}), 404
+    return "Page not found", 404
+
+
+@app.errorhandler(413)
+def too_large(e):
+    return jsonify({"error": "File too large. Maximum size is 100 MB."}), 413
+
+
+@app.errorhandler(500)
+def internal_error(e):
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Internal server error"}), 500
+    return "Internal server error", 500
 
 
 @app.context_processor
@@ -1397,6 +1505,11 @@ def artifacts_library_page():
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
     from flask import send_from_directory
+    # Resolve the real path and verify it's within UPLOAD_DIR
+    real_upload = os.path.realpath(UPLOAD_DIR)
+    real_file = os.path.realpath(os.path.join(UPLOAD_DIR, filename))
+    if not real_file.startswith(real_upload + os.sep) and real_file != real_upload:
+        abort(404)
     return send_from_directory(UPLOAD_DIR, filename)
 
 
@@ -1512,12 +1625,17 @@ def setup():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        # Rate limiting
+        client_ip = request.remote_addr
+        if not _check_rate_limit(client_ip):
+            return render_template("login.html", error="Too many login attempts. Please wait 5 minutes.")
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         conn = get_db()
         user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         conn.close()
         if user and check_password_hash(user['password_hash'], password):
+            session.clear()  # Prevent session fixation
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
@@ -1526,7 +1644,7 @@ def login():
     return render_template("login.html", error=None)
 
 
-@app.route("/logout")
+@app.route("/logout", methods=["GET", "POST"])
 def logout():
     session.clear()
     return redirect(url_for('login'))
@@ -1619,7 +1737,7 @@ def admin_edit_user(user_id):
     if old_user['role'] != role:
         changes.append(f"Role: {old_user['role']} -> {role}")
     if changes:
-        audit_log(conn, 'edit_user', 'user', str(user_id), '; '.join(changes))
+        log_audit('edit_user', 'user', str(user_id), '; '.join(changes), conn=conn)
     conn.close()
     return jsonify({"ok": True})
 
@@ -1736,5 +1854,5 @@ if __name__ == "__main__":
         except Exception:
             pass
 
-    debug = os.environ.get("FLASK_DEBUG", "1") == "1"
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
     app.run(host="0.0.0.0", port=3300, debug=debug)

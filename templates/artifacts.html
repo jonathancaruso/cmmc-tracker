@@ -130,27 +130,30 @@
             return;
         }
         body.innerHTML = artifacts.map(a => {
-            const displayName = a.filename.split('/').pop();
+            const displayName = escapeHtml(a.filename.split('/').pop());
             const badges = (a.linked_objectives || []).map(lo =>
-                `<span class="linked-badge">${lo.id}<span class="unlink-btn" onclick="unlinkFromLibrary(${a.id}, '${lo.id}')" title="Unlink">✕</span></span>`
+                `<span class="linked-badge">${escapeHtml(lo.id)}<span class="unlink-btn" onclick="unlinkFromLibrary(${parseInt(a.id)}, ${JSON.stringify(lo.id)})" title="Unlink">✕</span></span>`
             ).join('');
+            const safeColor = escapeHtml(a.domain_color || '#6366f1');
             const domainHtml = a.domain_name
-                ? `<span class="domain-tag" style="background:${a.domain_color || '#6366f1'}22;color:${a.domain_color || '#6366f1'}">${a.domain_name}</span>`
+                ? `<span class="domain-tag" style="background:${safeColor}22;color:${safeColor}">${escapeHtml(a.domain_name)}</span>`
                 : '<span style="color:var(--text-dim)">—</span>';
-            return `<tr data-search="${(displayName + ' ' + a.original_name + ' ' + (a.domain_name||'') + ' ' + (a.linked_objectives||[]).map(l=>l.id).join(' ') + ' ' + (a.obtained_method||'')).toLowerCase()}">
-                <td><a href="/uploads/${a.filename}" target="_blank" style="color:var(--link);text-decoration:none;font-weight:600;">${displayName}</a></td>
-                <td style="color:var(--text-secondary);font-size:0.75rem;">${a.original_name}</td>
+            const safeFilename = encodeURIComponent(a.filename).replace(/%2F/g, '/');
+            const searchText = escapeHtml((a.filename.split('/').pop() + ' ' + a.original_name + ' ' + (a.domain_name||'') + ' ' + (a.linked_objectives||[]).map(l=>l.id).join(' ') + ' ' + (a.obtained_method||'')).toLowerCase());
+            return `<tr data-search="${searchText}">
+                <td><a href="/uploads/${safeFilename}" target="_blank" style="color:var(--link);text-decoration:none;font-weight:600;">${displayName}</a></td>
+                <td style="color:var(--text-secondary);font-size:0.75rem;">${escapeHtml(a.original_name)}</td>
                 <td>${domainHtml}</td>
                 <td>
                     <div style="display:flex;flex-wrap:wrap;gap:0.15rem;">${badges}</div>
-                    <div class="link-search" data-artifact-id="${a.id}">
-                        <input type="text" placeholder="+ Link..." oninput="searchForLink(this, ${a.id})" onfocus="if(this.value)searchForLink(this, ${a.id})">
+                    <div class="link-search" data-artifact-id="${parseInt(a.id)}">
+                        <input type="text" placeholder="+ Link..." oninput="searchForLink(this, ${parseInt(a.id)})" onfocus="if(this.value)searchForLink(this, ${parseInt(a.id)})">
                         <div class="link-results"></div>
                     </div>
                 </td>
-                <td style="white-space:nowrap;color:var(--text-dim);font-size:0.75rem;">${a.uploaded_at || ''}</td>
-                <td style="color:var(--text-secondary);font-size:0.75rem;">${a.obtained_method || ''}</td>
-                <td><span style="cursor:pointer;color:var(--text-dim);font-size:0.8rem;" onclick="deleteFromLibrary(${a.id})" title="Delete artifact">🗑</span></td>
+                <td style="white-space:nowrap;color:var(--text-dim);font-size:0.75rem;">${escapeHtml(a.uploaded_at || '')}</td>
+                <td style="color:var(--text-secondary);font-size:0.75rem;">${escapeHtml(a.obtained_method || '')}</td>
+                <td><span style="cursor:pointer;color:var(--text-dim);font-size:0.8rem;" onclick="deleteFromLibrary(${parseInt(a.id)})" title="Delete artifact">🗑</span></td>
             </tr>`;
         }).join('');
     }
@@ -197,8 +200,8 @@
                 resultsDiv.innerHTML = '<div class="lr-item" style="color:var(--text-dim)">No matches</div>';
             } else {
                 resultsDiv.innerHTML = results.slice(0, 8).map(r =>
-                    `<div class="lr-item" onclick="doLink(${artifactId}, '${r.id}', this.closest('.link-search').querySelector('input'))">
-                        <strong style="color:var(--link)">${r.id}</strong> — ${r.family}
+                    `<div class="lr-item" onclick="doLink(${parseInt(artifactId)}, ${JSON.stringify(r.id)}, this.closest('.link-search').querySelector('input'))">
+                        <strong style="color:var(--link)">${escapeHtml(r.id)}</strong> — ${escapeHtml(r.family)}
                     </div>`
                 ).join('');
             }
@@ -207,9 +210,8 @@
     }
 
     async function doLink(artifactId, objectiveId, input) {
-        const res = await fetch(`/api/artifacts/${artifactId}/link`, {
+        const res = await _fetchJson(`/api/artifacts/${artifactId}/link`, {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({objective_id: objectiveId})
         });
         const data = await res.json();
@@ -220,7 +222,7 @@
     }
 
     async function unlinkFromLibrary(artifactId, objectiveId) {
-        const res = await fetch(`/api/artifacts/${artifactId}/link/${encodeURIComponent(objectiveId)}`, { method: 'DELETE' });
+        const res = await _fetchJson(`/api/artifacts/${artifactId}/link/${encodeURIComponent(objectiveId)}`, { method: 'DELETE' });
         const data = await res.json();
         if (data.error) { showToast(data.error); return; }
         loadLibrary();
@@ -228,7 +230,7 @@
 
     async function deleteFromLibrary(artifactId) {
         if (!confirm('Delete this artifact permanently?')) return;
-        await fetch(`/api/artifacts/delete/${artifactId}`, { method: 'POST' });
+        await _fetchJson(`/api/artifacts/delete/${artifactId}`, { method: 'POST' });
         loadLibrary();
     }
 

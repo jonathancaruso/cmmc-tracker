@@ -57,7 +57,26 @@
     .theme-toggle:hover, .font-btn:hover { color: var(--text-primary); border-color: var(--text-dim); }
     .font-controls { display: inline-flex; gap: 0.2rem; }
 </style>
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <script>
+// --- CSRF + XSS helpers ---
+const _csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+const _csrfHeaders = {'X-CSRF-Token': _csrfToken};
+function _fetchJson(url, opts = {}) {
+    opts.headers = Object.assign({}, opts.headers || {}, _csrfHeaders);
+    if (opts.body && typeof opts.body === 'string') {
+        opts.headers['Content-Type'] = opts.headers['Content-Type'] || 'application/json';
+    }
+    return fetch(url, opts);
+}
+function _fetchForm(url, formData) {
+    formData.append('csrf_token', _csrfToken);
+    return fetch(url, { method: 'POST', body: formData });
+}
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 (function() {
     const saved = localStorage.getItem('cmmc-theme') || 'dark';
     document.documentElement.setAttribute('data-theme', saved);

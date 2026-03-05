@@ -42,6 +42,7 @@
         </div>
         {% endif %}
         <form method="POST" action="/setup">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label>First Name</label>
                 <input type="text" name="first_name" value="{{ first_name or '' }}" required autofocus>
