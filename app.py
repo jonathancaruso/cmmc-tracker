@@ -6,7 +6,6 @@ import re
 import sqlite3
 import csv
 import io
-import string
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request, Response
 from openpyxl import load_workbook
@@ -756,26 +755,20 @@ def list_artifacts(objective_id):
 
 
 def _generate_artifact_filename(conn, objective_id, domain_name, ext):
-    """Generate auto-renamed filename: {objective_id}_{letter}_{domain}{ext}"""
-    # Clean objective_id: 3.1.1[a] -> 3.1.1.a
+    """Generate auto-renamed filename: AC-3.01.01.a-Domain{ext}"""
+    # Clean objective_id: 3.1.1[a] -> 3.01.01.a
     clean_id = objective_id.replace("[", ".").replace("]", "").replace(" ", "").replace("\t", "")
     # Get family abbreviation prefix from the objective
     obj_row = conn.execute("SELECT family FROM objectives WHERE id = ?", (objective_id,)).fetchone()
     abbr = FAMILY_ABBR.get(obj_row["family"], "") if obj_row else ""
     prefix = f"{abbr}-{clean_id}" if abbr else clean_id
 
-    # Count existing artifacts for this objective to determine letter
-    count = conn.execute(
-        "SELECT COUNT(*) FROM artifacts WHERE objective_id = ?", (objective_id,)
-    ).fetchone()[0]
-    letter = string.ascii_uppercase[min(count, 25)]
-
     # Domain part
     domain_part = ""
     if domain_name:
-        domain_part = "_" + domain_name.replace(" ", "-")
+        domain_part = "-" + domain_name.replace(" ", "-")
 
-    return f"{prefix}_{letter}{domain_part}{ext}"
+    return f"{prefix}{domain_part}{ext}"
 
 
 @app.route("/api/upload", methods=["POST"])
