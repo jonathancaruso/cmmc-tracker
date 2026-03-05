@@ -44,8 +44,7 @@ def init_db():
             artifact_notes TEXT DEFAULT '',
             captured_date TEXT,
             requirement_type TEXT DEFAULT '',
-            discussion TEXT DEFAULT '',
-            obtained_method TEXT DEFAULT ''
+            discussion TEXT DEFAULT ''
         )
     """)
     conn.execute("""
@@ -129,12 +128,12 @@ def init_db():
         except Exception:
             pass
 
-    # Migrate: add obtained_method to objectives
+    # Migrate: add obtained_method to artifacts
     try:
-        conn.execute("SELECT obtained_method FROM objectives LIMIT 1")
+        conn.execute("SELECT obtained_method FROM artifacts LIMIT 1")
     except Exception:
         try:
-            conn.execute("ALTER TABLE objectives ADD COLUMN obtained_method TEXT DEFAULT ''")
+            conn.execute("ALTER TABLE artifacts ADD COLUMN obtained_method TEXT DEFAULT ''")
         except Exception:
             pass
 
@@ -977,13 +976,12 @@ def update_artifact_domain(artifact_id):
     return jsonify({"ok": True, "filename": new_filename})
 
 
-@app.route("/api/obtained", methods=["POST"])
-def update_obtained():
+@app.route("/api/artifacts/<int:artifact_id>/obtained", methods=["PATCH"])
+def update_artifact_obtained(artifact_id):
     data = request.json
-    obj_id = data.get("id")
     method = data.get("obtained_method", "")
     conn = get_db()
-    conn.execute("UPDATE objectives SET obtained_method = ? WHERE id = ?", (method, obj_id))
+    conn.execute("UPDATE artifacts SET obtained_method = ? WHERE id = ?", (method, artifact_id))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
