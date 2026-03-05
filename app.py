@@ -764,6 +764,72 @@ def list_artifacts(objective_id):
     return jsonify([dict(r) for r in rows])
 
 
+def _extract_file_created(filepath, ext):
+    """Extract creation/modification date from file metadata."""
+    try:
+        # Images (EXIF)
+        if ext in ('.jpg', '.jpeg', '.png', '.gif', '.webp'):
+            from PIL import Image
+            from PIL.ExifTags import Base as ExifBase
+            img = Image.open(filepath)
+            exif = img.getexif()
+            if exif:
+                # Try DateTimeOriginal, then DateTimeDigitized, then DateTime
+                for tag in (ExifBase.DateTimeOriginal, ExifBase.DateTimeDigitized, ExifBase.DateTime):
+                    val = exif.get(tag)
+                    if val:
+                        # EXIF format: "2026:03:05 10:30:00"
+                        return val.replace(":", "-", 2)
+            img.close()
+
+        # PDFs
+        elif ext == '.pdf':
+            from pypdf import PdfReader
+            reader = PdfReader(filepath)
+            info = reader.metadata
+            if info:
+                for field in (info.creation_date, info.modification_date):
+                    if field:
+                        return field.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Word docs (.docx)
+        elif ext == '.docx':
+            from docx import Document
+            doc = Document(filepath)
+            props = doc.core_properties
+            if props.created:
+                return props.created.strftime("%Y-%m-%d %H:%M:%S")
+            if props.modified:
+                return props.modified.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Excel (.xlsx)
+        elif ext == '.xlsx':
+            from openpyxl import load_workbook
+            wb = load_workbook(filepath, read_only=True)
+            props = wb.properties
+            if props.created:
+                return props.created.strftime("%Y-%m-%d %H:%M:%S")
+            if props.modified:
+                return props.modified.strftime("%Y-%m-%d %H:%M:%S")
+            wb.close()
+
+        # PowerPoint (.pptx) - uses same OPC format as docx
+        elif ext == '.pptx':
+            import zipfile
+            from xml.etree import ElementTree
+            with zipfile.ZipFile(filepath) as z:
+                if 'docProps/core.xml' in z.namelist():
+                    tree = ElementTree.parse(z.open('docProps/core.xml'))
+                    ns = {'dcterms': 'http://purl.org/dc/terms/'}
+                    created = tree.find('.//dcterms:created', ns)
+                    if created is not None and created.text:
+                        return created.text[:19].replace("T", " ")
+
+    except Exception:
+        pass
+    return None
+
+
 def _generate_artifact_filename(conn, objective_id, domain_name, ext):
     """Generate auto-renamed filename: AC-3.01.01.a-Domain{ext}"""
     # Clean objective_id: 3.1.1[a] -> 3.01.01.a
@@ -826,15 +892,8 @@ def upload_artifact():
     file.save(filepath)
     file_size = os.path.getsize(filepath)
 
-    # Try to get file creation/modification date from metadata
-    file_created = None
-    try:
-        stat = os.stat(filepath)
-        # Use the earlier of ctime and mtime as creation date
-        ctime = min(stat.st_ctime, stat.st_mtime)
-        file_created = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M:%S")
-    except Exception:
-        pass
+    # Extract creation date from file metadata
+    file_created = _extract_file_created(filepath, ext)
 
     conn.execute("""
         INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at, domain_id, file_created)
