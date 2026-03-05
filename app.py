@@ -424,7 +424,7 @@ def admin_required(f):
 def check_auth():
     if request.endpoint in ('static', None):
         return
-    PUBLIC_ENDPOINTS = {'login', 'setup'}
+    PUBLIC_ENDPOINTS = {'login', 'setup', 'landing'}
     conn = get_db()
     user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     conn.close()
@@ -1826,6 +1826,110 @@ def audit_log_page():
                            actions=[a[0] for a in actions],
                            filter_user=filter_user, filter_action=filter_action,
                            filter_from=filter_from, filter_to=filter_to)
+
+
+@app.route("/report")
+def report():
+    conn = get_db()
+    # Overall totals
+    totals = conn.execute("""
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN o.captured = 1 THEN 1 ELSE 0 END) as captured,
+               SUM(CASE WHEN o.status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
+               SUM(CASE WHEN o.status = 'Evidence Collected' THEN 1 ELSE 0 END) as evidence_collected,
+               SUM(CASE WHEN o.status = 'Reviewed' THEN 1 ELSE 0 END) as reviewed
+        FROM objectives o
+    """).fetchone()
+    totals = dict(totals)
+
+    # Per-family summary (for exec summary table)
+    families = conn.execute("""
+        SELECT o.family,
+               COUNT(*) as total,
+               SUM(CASE WHEN o.captured = 1 THEN 1 ELSE 0 END) as captured,
+               SUM(CASE WHEN o.status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
+               SUM(CASE WHEN o.status = 'Evidence Collected' THEN 1 ELSE 0 END) as evidence_collected,
+               SUM(CASE WHEN o.status = 'Reviewed' THEN 1 ELSE 0 END) as reviewed,
+               COALESCE(SUM(CASE WHEN a.id IS NOT NULL THEN 1 ELSE 0 END), 0) as artifact_count
+        FROM objectives o
+        LEFT JOIN artifacts a ON o.id = a.objective_id
+        GROUP BY o.family ORDER BY o.family
+    """).fetchall()
+    families = [dict(f) for f in families]
+
+    # All objectives with artifacts and assignments, grouped by family then requirement
+    all_objectives = conn.execute("""
+        SELECT * FROM objectives ORDER BY sort_as
+    """).fetchall()
+
+    # Prefetch all artifacts via artifact_objectives junction
+    all_artifacts = conn.execute("""
+        SELECT ao.objective_id, a.id, a.original_name, a.obtained_method,
+               d.name as domain_name
+        FROM artifact_objectives ao
+        JOIN artifacts a ON ao.artifact_id = a.id
+        LEFT JOIN domains d ON a.domain_id = d.id
+        ORDER BY a.uploaded_at DESC
+    """).fetchall()
+
+    # Prefetch all assignments
+    all_assignments = conn.execute("""
+        SELECT aa.objective_id, t.name, aa.status
+        FROM artifact_assignments aa
+        JOIN team_members t ON aa.member_id = t.id
+    """).fetchall()
+    conn.close()
+
+    # Index artifacts and assignments by objective_id
+    artifacts_by_obj = {}
+    for art in all_artifacts:
+        artifacts_by_obj.setdefault(art["objective_id"], []).append(dict(art))
+    assignments_by_obj = {}
+    for asn in all_assignments:
+        assignments_by_obj.setdefault(asn["objective_id"], []).append(dict(asn))
+
+    # Build family_details: {family_name: {total, captured, artifact_count, requirements: {req_id: {security_requirement, discussion, objectives: [...]}}}}
+    family_details = {}
+    for obj in all_objectives:
+        obj = dict(obj)
+        fname = obj["family"]
+        if fname not in family_details:
+            family_details[fname] = {"total": 0, "captured": 0, "artifact_count": 0, "requirements": {}}
+        fd = family_details[fname]
+        fd["total"] += 1
+        if obj.get("captured"):
+            fd["captured"] += 1
+
+        req_id = obj["requirement_id"]
+        if req_id not in fd["requirements"]:
+            fd["requirements"][req_id] = {
+                "security_requirement": obj.get("security_requirement", ""),
+                "discussion": obj.get("discussion", ""),
+                "objectives": []
+            }
+
+        obj["artifacts"] = artifacts_by_obj.get(obj["id"], [])
+        obj["assignments"] = assignments_by_obj.get(obj["id"], [])
+        fd["artifact_count"] += len(obj["artifacts"])
+        fd["requirements"][req_id]["objectives"].append(obj)
+
+    pct_complete = round(totals["captured"] / totals["total"] * 100, 1) if totals["total"] else 0
+    org_name = os.environ.get("ORG_NAME", "Organization")
+
+    generated_date = datetime.now().strftime("%B %d, %Y")
+
+    return render_template("report.html",
+                           totals=totals, families=families,
+                           family_details=family_details,
+                           pct_complete=pct_complete,
+                           org_name=org_name,
+                           generated_date=generated_date,
+                           abbr=FAMILY_ABBR, colors=FAMILY_COLORS)
+
+
+@app.route("/landing")
+def landing():
+    return render_template("landing.html")
 
 
 if __name__ == "__main__":

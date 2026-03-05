@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assessment Report — CMMC Artifact Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+        .topnav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 0.75rem; }
+        .topnav-left { display: flex; align-items: center; gap: 1rem; }
+        .topnav-left a.back { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; }
+        .topnav-left a.back:hover { color: var(--text-primary); }
+        .topnav-right { display: flex; gap: 0.5rem; align-items: center; }
+        .nav-btn { background: var(--border); color: var(--text-primary); border: 1px solid var(--border-light); padding: 0.4rem 0.75rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.8rem; text-decoration: none; }
+        .nav-btn:hover { background: var(--border-light); }
+        .print-btn { background: var(--accent); color: #fff; border: none; padding: 0.5rem 1.2rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .print-btn:hover { opacity: 0.9; }
+        .font-controls { display: inline-flex; gap: 0.2rem; }
+
+        /* Cover page */
+        .cover { text-align: center; padding: 4rem 2rem; margin-bottom: 2rem; background: var(--bg-secondary); border-radius: 1rem; }
+        .cover h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .cover .subtitle { color: var(--text-muted); font-size: 1.2rem; margin-bottom: 1.5rem; }
+        .cover .org-name { font-size: 1.5rem; color: var(--accent); font-weight: 700; margin-bottom: 0.5rem; }
+        .cover .date { color: var(--text-dim); font-size: 1rem; }
+
+        /* Executive Summary */
+        .exec-summary { background: var(--bg-secondary); border-radius: 1rem; padding: 2rem; margin-bottom: 2rem; }
+        .exec-summary h2 { font-size: 1.3rem; margin-bottom: 1.25rem; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .summary-stat { background: var(--bg-tertiary); border-radius: 0.75rem; padding: 1rem; text-align: center; }
+        .summary-stat .num { font-size: 2rem; font-weight: 800; color: var(--accent); }
+        .summary-stat .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+        .summary-stat.complete .num { color: var(--success-text); }
+        .summary-stat.warning .num { color: var(--warning-text); }
+        .summary-stat.danger .num { color: var(--danger-text); }
+
+        .progress-bar { width: 100%; height: 1.5rem; background: var(--border); border-radius: 0.75rem; overflow: hidden; margin-bottom: 0.5rem; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple-text)); border-radius: 0.75rem; }
+        .pct-label { text-align: right; font-size: 0.85rem; color: var(--text-muted); }
+
+        /* Family summary table */
+        .family-summary { margin-top: 1.5rem; }
+        .family-summary h3 { font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-secondary); }
+        .summary-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .summary-table th { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 2px solid var(--border); color: var(--text-muted); font-weight: 600; }
+        .summary-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); }
+        .summary-table tr:hover { background: var(--bg-hover); }
+        .family-abbr { display: inline-block; font-weight: 800; font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 0.2rem; color: #fff; margin-right: 0.5rem; }
+        .pct-bar-cell { width: 120px; }
+        .mini-bar { width: 100%; height: 0.4rem; background: var(--border); border-radius: 0.2rem; overflow: hidden; }
+        .mini-fill { height: 100%; border-radius: 0.2rem; }
+
+        /* Family detail sections */
+        .family-section { background: var(--bg-secondary); border-radius: 1rem; padding: 2rem; margin-bottom: 2rem; }
+        .family-section h2 { font-size: 1.2rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.75rem; }
+        .family-meta { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 1.5rem; }
+
+        .req-group { margin-bottom: 1.5rem; }
+        .req-header { font-weight: 700; font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 0.25rem; }
+        .req-text { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.5; }
+
+        .obj-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 0.5rem; }
+        .obj-table th { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 2px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: 0.75rem; }
+        .obj-table td { padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+        .obj-table tr:hover { background: var(--bg-hover); }
+
+        .status-badge { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 0.2rem; white-space: nowrap; }
+        .st-complete { background: var(--success-bg); color: var(--success-text); }
+        .st-reviewed { background: var(--purple-bg); color: var(--purple-text); }
+        .st-evidence { background: var(--warning-bg); color: var(--warning-text); }
+        .st-inprogress { background: #1e3a5f; color: #60a5fa; }
+        .st-notstarted { background: var(--border); color: var(--text-dim); }
+
+        .artifact-list { font-size: 0.75rem; color: var(--text-secondary); }
+        .artifact-list .a-item { margin-bottom: 0.15rem; }
+        .assignment-list { font-size: 0.75rem; color: var(--text-dim); }
+
+        .captured-yes { color: var(--success-text); font-weight: 700; }
+        .captured-no { color: var(--text-dim); }
+
+        /* Footer */
+        .report-footer { text-align: center; color: var(--text-dim); font-size: 0.8rem; margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+
+        /* ========== PRINT STYLES ========== */
+        @media print {
+            * { color-adjust: exact; -webkit-print-color-adjust: exact; }
+            body { background: #fff !important; color: #000 !important; font-size: 10pt; }
+            .container { max-width: 100%; padding: 0; margin: 0; }
+
+            /* Hide screen-only elements */
+            .topnav, .print-btn, .theme-toggle, .font-controls, .font-btn { display: none !important; }
+
+            /* Cover page */
+            .cover { background: none !important; border: 2px solid #000; border-radius: 0; padding: 3rem 2rem; page-break-after: always; }
+            .cover h1 { color: #000 !important; font-size: 24pt; }
+            .cover .subtitle { color: #333 !important; }
+            .cover .org-name { color: #000 !important; font-size: 18pt; }
+            .cover .date { color: #555 !important; }
+
+            /* Executive summary */
+            .exec-summary { background: none !important; border: 1px solid #ccc; border-radius: 0; padding: 1rem; page-break-after: always; }
+            .exec-summary h2 { color: #000 !important; }
+            .summary-grid { grid-template-columns: repeat(4, 1fr); }
+            .summary-stat { background: #f5f5f5 !important; border: 1px solid #ddd; border-radius: 0; }
+            .summary-stat .num { color: #000 !important; }
+            .summary-stat .label { color: #555 !important; }
+            .progress-bar { background: #ddd !important; height: 1rem; }
+            .progress-fill { background: #333 !important; }
+            .pct-label { color: #555 !important; }
+
+            /* Tables */
+            .summary-table th, .obj-table th { border-bottom: 2px solid #000 !important; color: #000 !important; }
+            .summary-table td, .obj-table td { border-bottom: 1px solid #ccc !important; color: #000 !important; }
+            .summary-table tr:hover, .obj-table tr:hover { background: none !important; }
+            .family-abbr { background: #333 !important; color: #fff !important; }
+            .mini-bar { background: #ddd !important; }
+            .mini-fill { background: #555 !important; }
+
+            /* Family sections */
+            .family-section { background: none !important; border: 1px solid #ccc; border-radius: 0; padding: 1rem; page-break-before: always; }
+            .family-section h2 { color: #000 !important; }
+            .family-meta { color: #555 !important; }
+            .req-header { color: #000 !important; }
+            .req-text { color: #333 !important; }
+
+            /* Status badges - B&W friendly */
+            .status-badge { border: 1px solid #999 !important; background: #f0f0f0 !important; color: #000 !important; }
+            .st-complete { background: #d0f0d0 !important; border-color: #060 !important; }
+            .st-notstarted { background: #f0f0f0 !important; border-color: #999 !important; }
+
+            .captured-yes { color: #000 !important; }
+            .captured-no { color: #999 !important; }
+            .artifact-list { color: #333 !important; }
+            .assignment-list { color: #555 !important; }
+
+            .report-footer { border-top: 1px solid #ccc !important; color: #555 !important; }
+
+            /* Prevent breaks inside rows */
+            .req-group { page-break-inside: avoid; }
+            .obj-table tr { page-break-inside: avoid; }
+        }
+    </style>
+    {% include "theme.html" %}
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation (screen only) -->
+        <div class="topnav">
+            <div class="topnav-left">
+                <a href="/" class="back">← Dashboard</a>
+                <span style="color:var(--text-muted);font-size:0.85rem;">Assessment Report</span>
+            </div>
+            <div class="topnav-right">
+                <button class="print-btn" onclick="window.print()">Print Report</button>
+                <a href="/artifacts" class="nav-btn" style="font-size:0.75rem;">Evidence Library</a>
+                <a href="/poam" class="nav-btn" style="font-size:0.75rem;">POA&M</a>
+                {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-btn" style="font-size:0.75rem;">Users</a><a href="/audit" class="nav-btn" style="font-size:0.75rem;">Audit Log</a>{% endif %}
+                <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span>
+                <button class="theme-toggle nav-btn" onclick="toggleTheme()">☀️</button>
+            </div>
+        </div>
+
+        <!-- COVER PAGE -->
+        <div class="cover">
+            <div class="org-name">{{ org_name }}</div>
+            <h1>CMMC Assessment Report</h1>
+            <div class="subtitle">NIST SP 800-171 Rev 2 Compliance Assessment</div>
+            <div class="date">Generated: {{ generated_date }}</div>
+        </div>
+
+        <!-- EXECUTIVE SUMMARY -->
+        <div class="exec-summary">
+            <h2>Executive Summary</h2>
+            <div class="summary-grid">
+                <div class="summary-stat">
+                    <div class="num">{{ totals.total }}</div>
+                    <div class="label">Total Objectives</div>
+                </div>
+                <div class="summary-stat complete">
+                    <div class="num">{{ totals.captured }}</div>
+                    <div class="label">Captured</div>
+                </div>
+                <div class="summary-stat warning">
+                    <div class="num">{{ totals.in_progress }}</div>
+                    <div class="label">In Progress</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="num">{{ totals.evidence_collected }}</div>
+                    <div class="label">Evidence Collected</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="num">{{ totals.reviewed }}</div>
+                    <div class="label">Reviewed</div>
+                </div>
+                <div class="summary-stat danger">
+                    <div class="num">{{ totals.total - totals.captured }}</div>
+                    <div class="label">Remaining</div>
+                </div>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ pct_complete }}%"></div>
+            </div>
+            <div class="pct-label">{{ pct_complete }}% Complete</div>
+
+            <!-- Family summary table -->
+            <div class="family-summary">
+                <h3>Summary by Family</h3>
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Family</th>
+                            <th>Total</th>
+                            <th>Captured</th>
+                            <th>In Progress</th>
+                            <th>Evidence</th>
+                            <th>Reviewed</th>
+                            <th>Artifacts</th>
+                            <th class="pct-bar-cell">Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in families %}
+                        {% set fpct = ((f.captured / f.total * 100) if f.total else 0) | round(1) %}
+                        <tr>
+                            <td>
+                                <span class="family-abbr" style="background:{{ colors.get(abbr.get(f.family, ''), '#666') }}">{{ abbr.get(f.family, '?') }}</span>
+                                {{ f.family }}
+                            </td>
+                            <td>{{ f.total }}</td>
+                            <td>{{ f.captured }}</td>
+                            <td>{{ f.in_progress }}</td>
+                            <td>{{ f.evidence_collected }}</td>
+                            <td>{{ f.reviewed }}</td>
+                            <td>{{ f.artifact_count }}</td>
+                            <td class="pct-bar-cell">
+                                <div class="mini-bar"><div class="mini-fill" style="width:{{ fpct }}%; background:{{ colors.get(abbr.get(f.family, ''), '#666') }}"></div></div>
+                                <span style="font-size:0.7rem;color:var(--text-dim)">{{ fpct }}%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- PER-FAMILY DETAIL SECTIONS -->
+        {% for family_name, data in family_details.items() %}
+        {% set fab = abbr.get(family_name, '?') %}
+        {% set fcolor = colors.get(fab, '#666') %}
+        <div class="family-section">
+            <h2>
+                <span class="family-abbr" style="background:{{ fcolor }}">{{ fab }}</span>
+                {{ family_name }}
+            </h2>
+            <div class="family-meta">
+                {{ data.total }} objectives &middot;
+                {{ data.captured }} captured ({{ ((data.captured / data.total * 100) if data.total else 0) | round(1) }}%) &middot;
+                {{ data.artifact_count }} artifacts attached
+            </div>
+
+            {% for req_id, req in data.requirements.items() %}
+            <div class="req-group">
+                <div class="req-header">{{ req_id }}: {{ req.security_requirement }}</div>
+                {% if req.discussion %}
+                <div class="req-text">{{ req.discussion }}</div>
+                {% endif %}
+                <table class="obj-table">
+                    <thead>
+                        <tr>
+                            <th style="width:8%">ID</th>
+                            <th style="width:30%">Assessment Objective</th>
+                            <th style="width:9%">Status</th>
+                            <th style="width:7%">Captured</th>
+                            <th style="width:20%">Artifacts</th>
+                            <th style="width:13%">Assigned To</th>
+                            <th style="width:13%">Obtained Method</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for obj in req.objectives %}
+                        <tr>
+                            <td style="font-weight:600;font-size:0.75rem;">{{ obj.id }}</td>
+                            <td>{{ obj.assessment_objective }}</td>
+                            <td>
+                                {% if obj.status == 'Complete' %}
+                                <span class="status-badge st-complete">Complete</span>
+                                {% elif obj.status == 'Reviewed' %}
+                                <span class="status-badge st-reviewed">Reviewed</span>
+                                {% elif obj.status == 'Evidence Collected' %}
+                                <span class="status-badge st-evidence">Evidence</span>
+                                {% elif obj.status == 'In Progress' %}
+                                <span class="status-badge st-inprogress">In Progress</span>
+                                {% else %}
+                                <span class="status-badge st-notstarted">Not Started</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if obj.captured %}
+                                <span class="captured-yes">Yes</span>
+                                {% else %}
+                                <span class="captured-no">No</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="artifact-list">
+                                    {% for art in obj.artifacts %}
+                                    <div class="a-item">{{ art.original_name }}{% if art.domain_name %} <span style="opacity:0.6">[{{ art.domain_name }}]</span>{% endif %}</div>
+                                    {% endfor %}
+                                    {% if not obj.artifacts %}
+                                    <span style="color:var(--text-dim)">—</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="assignment-list">
+                                    {% for a in obj.assignments %}
+                                    <div>{{ a.name }}{% if a.status != 'assigned' %} ({{ a.status }}){% endif %}</div>
+                                    {% endfor %}
+                                    {% if not obj.assignments %}
+                                    <span style="color:var(--text-dim)">—</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="artifact-list">
+                                    {% set methods = obj.artifacts | selectattr('obtained_method') | map(attribute='obtained_method') | unique | list %}
+                                    {% if methods %}
+                                    {{ methods | join(', ') }}
+                                    {% else %}
+                                    <span style="color:var(--text-dim)">—</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+
+        <div class="report-footer">
+            CMMC Assessment Report — {{ org_name }} — {{ generated_date }}
+        </div>
+    </div>
+</body>
+</html>

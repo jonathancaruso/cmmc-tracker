@@ -37,6 +37,7 @@
             <a href="/" class="back">← Back to Dashboard</a>
             {% if current_user %}
             <a href="/artifacts" style="color:var(--text-dim);font-size:0.8rem;margin-left:1rem;">Evidence Library</a>
+            <a href="/report" style="color:var(--text-dim);font-size:0.8rem;margin-left:0.5rem;">Report</a>
             <span style="color:var(--text-dim);font-size:0.8rem;margin-left:1rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
             {% if current_user.role == 'admin' %}<a href="/admin/users" style="color:var(--text-dim);font-size:0.8rem;margin-left:0.5rem;">Users</a><a href="/audit" style="color:var(--text-dim);font-size:0.8rem;margin-left:0.5rem;">Audit Log</a>{% endif %}
             <a href="/logout" style="color:var(--text-dim);font-size:0.8rem;margin-left:0.5rem;">Logout</a>

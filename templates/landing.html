@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMMC Artifact Tracker — Streamline Your CMMC Assessment</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #162032;
+            --bg-hover: #253348;
+            --border: #334155;
+            --border-light: #475569;
+            --text-primary: #e2e8f0;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --link: #38bdf8;
+            --accent: #38bdf8;
+            --success-bg: #064e3b;
+            --success-text: #34d399;
+            --warning-text: #f59e0b;
+            --purple-text: #a78bfa;
+        }
+        [data-theme="light"] {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --bg-hover: #e2e8f0;
+            --border: #e2e8f0;
+            --border-light: #cbd5e1;
+            --text-primary: #1e293b;
+            --text-secondary: #334155;
+            --text-muted: #64748b;
+            --text-dim: #94a3b8;
+            --link: #2563eb;
+            --accent: #2563eb;
+            --success-bg: #dcfce7;
+            --success-text: #166534;
+            --warning-text: #92400e;
+            --purple-text: #6d28d9;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+        /* Top bar */
+        .landing-nav { max-width: 1200px; margin: 0 auto; padding: 1.5rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .landing-nav .logo { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); text-decoration: none; }
+        .landing-nav .logo span { color: var(--accent); }
+        .landing-nav .nav-links { display: flex; gap: 1rem; align-items: center; }
+        .landing-nav .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; }
+        .landing-nav .nav-links a:hover { color: var(--text-primary); }
+        .btn-login { background: var(--border); color: var(--text-primary) !important; padding: 0.45rem 1rem; border-radius: 0.5rem; font-weight: 600; }
+        .btn-login:hover { background: var(--border-light) !important; }
+
+        /* Hero */
+        .hero { max-width: 1200px; margin: 0 auto; padding: 5rem 2rem 4rem; text-align: center; }
+        .hero h1 { font-size: 3rem; font-weight: 800; line-height: 1.15; margin-bottom: 1.25rem; }
+        .hero h1 span { color: var(--accent); }
+        .hero .subtitle { font-size: 1.2rem; color: var(--text-muted); max-width: 650px; margin: 0 auto 2rem; line-height: 1.6; }
+        .cta-group { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        .btn-cta { display: inline-block; background: var(--accent); color: #fff; padding: 0.85rem 2rem; border-radius: 0.6rem; font-size: 1.05rem; font-weight: 700; text-decoration: none; transition: opacity 0.15s; }
+        .btn-cta:hover { opacity: 0.9; }
+        .btn-secondary { display: inline-block; background: var(--bg-secondary); color: var(--text-primary); padding: 0.85rem 2rem; border-radius: 0.6rem; font-size: 1.05rem; font-weight: 600; text-decoration: none; border: 1px solid var(--border); }
+        .btn-secondary:hover { background: var(--bg-hover); }
+
+        /* Screenshot placeholder */
+        .screenshot-area { max-width: 900px; margin: 3rem auto; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 1rem; padding: 3rem; text-align: center; min-height: 350px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 0.75rem; }
+        .screenshot-area .placeholder-icon { font-size: 3rem; opacity: 0.3; }
+        .screenshot-area .placeholder-text { color: var(--text-dim); font-size: 0.9rem; }
+
+        /* Features grid */
+        .features-section { max-width: 1200px; margin: 0 auto; padding: 4rem 2rem; }
+        .features-section h2 { text-align: center; font-size: 2rem; font-weight: 800; margin-bottom: 0.75rem; }
+        .features-section .section-sub { text-align: center; color: var(--text-muted); font-size: 1rem; margin-bottom: 3rem; max-width: 600px; margin-left: auto; margin-right: auto; }
+        .features-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+        .feature-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.75rem; transition: transform 0.15s, border-color 0.15s; }
+        .feature-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+        .feature-icon { font-size: 1.75rem; margin-bottom: 0.75rem; }
+        .feature-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .feature-card p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.55; }
+
+        /* Bottom CTA */
+        .bottom-cta { text-align: center; padding: 4rem 2rem; background: var(--bg-secondary); margin-top: 2rem; }
+        .bottom-cta h2 { font-size: 1.75rem; font-weight: 800; margin-bottom: 0.75rem; }
+        .bottom-cta p { color: var(--text-muted); margin-bottom: 2rem; font-size: 1rem; }
+
+        /* Footer */
+        .landing-footer { text-align: center; padding: 2rem; color: var(--text-dim); font-size: 0.8rem; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2rem; }
+            .hero .subtitle { font-size: 1rem; }
+            .features-grid { grid-template-columns: 1fr; }
+            .landing-nav { flex-wrap: wrap; gap: 0.75rem; }
+            .screenshot-area { min-height: 200px; margin: 2rem 1rem; }
+        }
+    </style>
+    <script>
+    (function() {
+        const saved = localStorage.getItem('cmmc-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', saved);
+    })();
+    </script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="landing-nav">
+        <a href="/landing" class="logo"><span>CMMC</span> Artifact Tracker</a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="/login" class="btn-login">Log In</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1>CMMC Artifact Tracker<br><span>Streamline Your CMMC Assessment</span></h1>
+        <p class="subtitle">
+            Track every NIST 800-171 objective, manage evidence artifacts, generate POA&Ms,
+            and produce audit-ready assessment reports — all in one place.
+        </p>
+        <div class="cta-group">
+            <a href="/setup" class="btn-cta">Get Started</a>
+            <a href="/login" class="btn-secondary">Log In</a>
+        </div>
+    </section>
+
+    <!-- Screenshot Placeholder -->
+    <div class="screenshot-area">
+        <div class="placeholder-icon">&#x1F4CA;</div>
+        <div class="placeholder-text">Dashboard screenshot</div>
+    </div>
+
+    <!-- Features Section -->
+    <section class="features-section" id="features">
+        <h2>Everything You Need for CMMC Compliance</h2>
+        <p class="section-sub">Built for organizations pursuing CMMC Level 2 certification with NIST SP 800-171 Rev 2 requirements.</p>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F4C1;</div>
+                <h3>Artifact Management</h3>
+                <p>Upload, organize, and track evidence artifacts by objective. Auto-naming, domain tagging, and SHA-256 hash verification keep your evidence library audit-ready.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F517;</div>
+                <h3>Evidence Mapping</h3>
+                <p>Link a single artifact to multiple objectives. Track coverage across all 14 security families with real-time progress dashboards and per-family breakdowns.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F4CB;</div>
+                <h3>POA&M Generator</h3>
+                <p>Automatically generate Plans of Action &amp; Milestones for uncaptured objectives. Set risk levels, milestones, remediation plans, and export to CSV.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F465;</div>
+                <h3>Team Assignments</h3>
+                <p>Assign objectives to team members with due dates and status tracking. Bulk-assign entire requirements and monitor individual workloads.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F50D;</div>
+                <h3>Audit Trail</h3>
+                <p>Every action is logged — uploads, status changes, assignments, and more. Filter by user, action type, and date range for complete accountability.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">&#x1F4CA;</div>
+                <h3>Assessment Reports</h3>
+                <p>Generate comprehensive, print-ready assessment reports with executive summaries, per-family breakdowns, artifact details, and assignment status.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bottom CTA -->
+    <div class="bottom-cta">
+        <h2>Ready to Streamline Your Assessment?</h2>
+        <p>Set up your organization and start tracking compliance in minutes.</p>
+        <a href="/setup" class="btn-cta">Get Started Now</a>
+    </div>
+
+    <!-- Footer -->
+    <footer class="landing-footer">
+        CMMC Artifact Tracker &middot; NIST SP 800-171 Rev 2
+    </footer>
+</body>
+</html>
