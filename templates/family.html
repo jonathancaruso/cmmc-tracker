@@ -329,15 +329,25 @@
         if (!container) return;
         const res = await fetch(`/api/artifacts/${encodeURIComponent(objId)}`);
         const artifacts = await res.json();
-        container.innerHTML = artifacts.map(a => `
-            <span class="artifact-item">
-                ${isImage(a.original_name) ? `<img src="/uploads/${a.filename}" class="preview">` : ''}
-                ${a.domain_name ? `<span class="domain-badge" style="background:${a.domain_color || '#334155'};color:#fff;padding:0.1rem 0.35rem;border-radius:0.2rem;font-size:0.6rem;font-weight:600;">${a.domain_name}</span>` : ''}
-                <a href="/uploads/${a.filename}" target="_blank">${a.original_name}</a>
-                <span class="size">(${formatSize(a.file_size)})</span>
-                <span class="delete-artifact" onclick="deleteArtifact(${a.id}, '${objId}')" title="Delete">✕</span>
-            </span>
-        `).join('');
+        container.innerHTML = artifacts.map(a => {
+            const displayName = a.filename.split('/').pop();
+            const meta = [];
+            if (a.file_size) meta.push(formatSize(a.file_size));
+            if (a.uploaded_at) meta.push('uploaded ' + a.uploaded_at);
+            if (a.file_created) meta.push('created ' + a.file_created);
+            return `
+            <span class="artifact-item" style="flex-direction:column;align-items:flex-start;padding:0.35rem 0.5rem;">
+                <span style="display:flex;align-items:center;gap:0.3rem;">
+                    ${isImage(a.original_name) ? `<img src="/uploads/${a.filename}" class="preview">` : ''}
+                    ${a.domain_name ? `<span class="domain-badge" style="background:${a.domain_color || '#334155'};color:#fff;padding:0.1rem 0.35rem;border-radius:0.2rem;font-size:0.6rem;font-weight:600;">${a.domain_name}</span>` : ''}
+                    <a href="/uploads/${a.filename}" target="_blank" style="font-weight:600;">${displayName}</a>
+                    <span class="delete-artifact" onclick="deleteArtifact(${a.id}, '${objId}')" title="Delete">✕</span>
+                </span>
+                <span style="color:#64748b;font-size:0.65rem;">
+                    ${a.original_name !== displayName ? `orig: ${a.original_name} · ` : ''}${meta.join(' · ')}
+                </span>
+            </span>`;
+        }).join('');
     }
     
     async function handleFileSelect(input, objId) {

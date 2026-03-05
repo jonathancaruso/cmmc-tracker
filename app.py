@@ -56,6 +56,7 @@ def init_db():
             file_size INTEGER,
             mime_type TEXT,
             uploaded_at TEXT NOT NULL,
+            file_created TEXT,
             FOREIGN KEY (objective_id) REFERENCES objectives(id)
         )
     """)
@@ -115,6 +116,15 @@ def init_db():
     except Exception:
         try:
             conn.execute("ALTER TABLE artifacts ADD COLUMN domain_id INTEGER REFERENCES domains(id)")
+        except Exception:
+            pass
+
+    # Migrate: add file_created to artifacts
+    try:
+        conn.execute("SELECT file_created FROM artifacts LIMIT 1")
+    except Exception:
+        try:
+            conn.execute("ALTER TABLE artifacts ADD COLUMN file_created TEXT")
         except Exception:
             pass
 
@@ -816,11 +826,21 @@ def upload_artifact():
     file.save(filepath)
     file_size = os.path.getsize(filepath)
 
+    # Try to get file creation/modification date from metadata
+    file_created = None
+    try:
+        stat = os.stat(filepath)
+        # Use the earlier of ctime and mtime as creation date
+        ctime = min(stat.st_ctime, stat.st_mtime)
+        file_created = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        pass
+
     conn.execute("""
-        INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at, domain_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at, domain_id, file_created)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (objective_id, f"{safe_id}/{filename}", file.filename, file_size,
-          file.content_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), domain_id))
+          file.content_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), domain_id, file_created))
     conn.commit()
     conn.close()
 
