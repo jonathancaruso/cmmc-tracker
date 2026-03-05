@@ -2,9 +2,11 @@
 """CMMC Artifact Tracker — Flask + SQLite"""
 
 import os
+import re
 import sqlite3
 import csv
 import io
+import string
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request, Response
 from openpyxl import load_workbook
@@ -68,6 +70,13 @@ def init_db():
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS domains (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            color TEXT NOT NULL DEFAULT '#6366f1'
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS artifact_assignments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             objective_id TEXT NOT NULL,
@@ -101,6 +110,22 @@ def init_db():
             conn.execute("UPDATE objectives SET status = 'Complete' WHERE captured = 1")
         except Exception:
             pass
+    # Migrate: add domain_id to artifacts
+    try:
+        conn.execute("SELECT domain_id FROM artifacts LIMIT 1")
+    except Exception:
+        try:
+            conn.execute("ALTER TABLE artifacts ADD COLUMN domain_id INTEGER REFERENCES domains(id)")
+        except Exception:
+            pass
+
+    # Seed default domains if table is empty
+    domain_count = conn.execute("SELECT COUNT(*) FROM domains").fetchone()[0]
+    if domain_count == 0:
+        for dname, dcolor in [("IT", "#3b82f6"), ("Security", "#ef4444"), ("Management", "#f59e0b"),
+                               ("HR", "#8b5cf6"), ("Facilities", "#10b981"), ("Legal", "#6366f1")]:
+            conn.execute("INSERT OR IGNORE INTO domains (name, color) VALUES (?, ?)", (dname, dcolor))
+
     conn.commit()
 
     # Check if objectives already seeded
@@ -284,10 +309,17 @@ def dashboard():
         FROM objectives o
         LEFT JOIN artifacts a ON o.id = a.objective_id
     """).fetchone()
+    domain_coverage = conn.execute("""
+        SELECT d.id, d.name, d.color, COUNT(DISTINCT a.objective_id) as obj_count
+        FROM domains d
+        LEFT JOIN artifacts a ON d.id = a.domain_id
+        GROUP BY d.id ORDER BY d.name
+    """).fetchall()
     conn.close()
     return render_template("dashboard.html",
                            families=families, totals=totals,
-                           abbr=FAMILY_ABBR, colors=FAMILY_COLORS)
+                           abbr=FAMILY_ABBR, colors=FAMILY_COLORS,
+                           domain_coverage=domain_coverage)
 
 
 @app.route("/family/<path:family_name>")
@@ -509,8 +541,9 @@ def config_page():
             (m["id"],)
         ).fetchone()
         counts[m["id"]] = row["c"]
+    domains = conn.execute("SELECT * FROM domains ORDER BY name").fetchall()
     conn.close()
-    return render_template("config.html", members=members, counts=counts)
+    return render_template("config.html", members=members, counts=counts, domains=domains)
 
 
 @app.route("/api/team", methods=["GET"])
@@ -556,6 +589,55 @@ def update_team_member(member_id):
         "UPDATE team_members SET name = ?, role = ?, email = ? WHERE id = ?",
         (data.get("name", ""), data.get("role", ""), data.get("email", ""), member_id)
     )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+### Domains ###
+
+@app.route("/api/domains", methods=["GET"])
+def list_domains():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM domains ORDER BY name").fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/domains", methods=["POST"])
+def add_domain():
+    data = request.json
+    name = data.get("name", "").strip()
+    color = data.get("color", "#6366f1").strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    conn = get_db()
+    try:
+        conn.execute("INSERT INTO domains (name, color) VALUES (?, ?)", (name, color))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "Domain already exists"}), 409
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/domains/<int:domain_id>", methods=["PATCH"])
+def update_domain(domain_id):
+    data = request.json
+    conn = get_db()
+    conn.execute("UPDATE domains SET name = ?, color = ? WHERE id = ?",
+                 (data.get("name", "").strip(), data.get("color", "#6366f1").strip(), domain_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/domains/<int:domain_id>", methods=["DELETE"])
+def delete_domain(domain_id):
+    conn = get_db()
+    conn.execute("UPDATE artifacts SET domain_id = NULL WHERE domain_id = ?", (domain_id,))
+    conn.execute("DELETE FROM domains WHERE id = ?", (domain_id,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -668,12 +750,37 @@ def bulk_assign():
 @app.route("/api/artifacts/<objective_id>")
 def list_artifacts(objective_id):
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM artifacts WHERE objective_id = ? ORDER BY uploaded_at DESC",
-        (objective_id,)
-    ).fetchall()
+    rows = conn.execute("""
+        SELECT a.*, d.name as domain_name, d.color as domain_color
+        FROM artifacts a
+        LEFT JOIN domains d ON a.domain_id = d.id
+        WHERE a.objective_id = ? ORDER BY a.uploaded_at DESC
+    """, (objective_id,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
+
+
+def _generate_artifact_filename(conn, objective_id, domain_name, ext):
+    """Generate auto-renamed filename: {objective_id}_{letter}_{domain}{ext}"""
+    # Clean objective_id: 3.1.1[a] -> 3.1.1.a
+    clean_id = objective_id.replace("[", ".").replace("]", "").replace(" ", "").replace("\t", "")
+    # Get family abbreviation prefix from the objective
+    obj_row = conn.execute("SELECT family FROM objectives WHERE id = ?", (objective_id,)).fetchone()
+    abbr = FAMILY_ABBR.get(obj_row["family"], "") if obj_row else ""
+    prefix = f"{abbr}-{clean_id}" if abbr else clean_id
+
+    # Count existing artifacts for this objective to determine letter
+    count = conn.execute(
+        "SELECT COUNT(*) FROM artifacts WHERE objective_id = ?", (objective_id,)
+    ).fetchone()[0]
+    letter = string.ascii_uppercase[min(count, 25)]
+
+    # Domain part
+    domain_part = ""
+    if domain_name:
+        domain_part = "_" + domain_name.replace(" ", "-")
+
+    return f"{prefix}_{letter}{domain_part}{ext}"
 
 
 @app.route("/api/upload", methods=["POST"])
@@ -690,26 +797,42 @@ def upload_artifact():
     if ext not in ALLOWED_EXTENSIONS:
         return jsonify({"error": f"File type {ext} not allowed"}), 400
 
+    domain_id = request.form.get("domain_id") or None
+    if domain_id:
+        domain_id = int(domain_id)
+
     # Create per-objective subdirectory
     safe_id = objective_id.replace("[", "").replace("]", "").replace(" ", "").replace("\t", "")
     obj_dir = os.path.join(UPLOAD_DIR, safe_id)
     os.makedirs(obj_dir, exist_ok=True)
 
-    # Unique filename
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    safe_name = "".join(c if c.isalnum() or c in ".-_" else "_" for c in file.filename)
-    filename = f"{timestamp}_{safe_name}"
-    filepath = os.path.join(obj_dir, filename)
-    file.save(filepath)
+    conn = get_db()
 
+    # Look up domain name for filename
+    domain_name = ""
+    if domain_id:
+        d = conn.execute("SELECT name FROM domains WHERE id = ?", (domain_id,)).fetchone()
+        if d:
+            domain_name = d["name"]
+
+    # Auto-rename
+    filename = _generate_artifact_filename(conn, objective_id, domain_name, ext)
+    filepath = os.path.join(obj_dir, filename)
+
+    # Avoid collision
+    if os.path.exists(filepath):
+        timestamp = datetime.now().strftime("%H%M%S")
+        filename = _generate_artifact_filename(conn, objective_id, domain_name, f"_{timestamp}{ext}")
+        filepath = os.path.join(obj_dir, filename)
+
+    file.save(filepath)
     file_size = os.path.getsize(filepath)
 
-    conn = get_db()
     conn.execute("""
-        INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at, domain_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     """, (objective_id, f"{safe_id}/{filename}", file.filename, file_size,
-          file.content_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+          file.content_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), domain_id))
     conn.commit()
     conn.close()
 

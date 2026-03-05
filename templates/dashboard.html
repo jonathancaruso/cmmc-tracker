@@ -115,8 +115,22 @@
                 <span style="font-size:0.8rem;color:#a78bfa;">🟣 Reviewed: <strong>{{ totals['reviewed'] or 0 }}</strong></span>
                 <span style="font-size:0.8rem;color:#34d399;">🟢 Complete: <strong>{{ totals['captured'] or 0 }}</strong></span>
             </div>
+            {% if domain_coverage %}
+            <div style="margin-top:1.25rem;border-top:1px solid #334155;padding-top:1rem;">
+                <h3 style="font-size:0.85rem;color:#94a3b8;margin-bottom:0.75rem;">Domain Coverage</h3>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                    {% for dc in domain_coverage %}
+                    <span style="font-size:0.8rem;display:inline-flex;align-items:center;gap:0.35rem;">
+                        <span style="display:inline-block;width:0.6rem;height:0.6rem;border-radius:50%;background:{{ dc['color'] }};"></span>
+                        <span style="color:#e2e8f0;font-weight:600;">{{ dc['name'] }}</span>
+                        <span style="color:#94a3b8;">{{ dc['obj_count'] }} obj</span>
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
-        
+
         <div class="filter-bar">
             <button class="filter-btn active" onclick="filterFamilies('all', this)">All ({{ families|length }})</button>
             <button class="filter-btn" onclick="filterFamilies('incomplete', this)">Incomplete</button>
