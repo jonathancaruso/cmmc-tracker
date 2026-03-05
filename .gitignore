@@ -3,5 +3,6 @@ __pycache__/
 venv/
 cmmc.db
 uploads/
+data/
 *.log
 .DS_Store
