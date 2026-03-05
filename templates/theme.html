@@ -1,0 +1,51 @@
+<style>
+    /* Light mode overrides */
+    [data-theme="light"] { background: #f8fafc !important; color: #1e293b !important; }
+    [data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea { background: #ffffff !important; color: #1e293b !important; border-color: #cbd5e1 !important; }
+    [data-theme="light"] input::placeholder { color: #94a3b8 !important; }
+    [data-theme="light"] .topnav .nav-btn, [data-theme="light"] .nav-btn { background: #e2e8f0 !important; color: #1e293b !important; border-color: #cbd5e1 !important; }
+    [data-theme="light"] .topnav .nav-btn:hover, [data-theme="light"] .nav-btn:hover { background: #cbd5e1 !important; }
+    [data-theme="light"] a { color: #2563eb; }
+    [data-theme="light"] a:hover { color: #1d4ed8; }
+    [data-theme="light"] table th { background: #e2e8f0 !important; color: #1e293b !important; }
+    [data-theme="light"] table td { border-color: #e2e8f0 !important; }
+    [data-theme="light"] .family-card, [data-theme="light"] .section { background: #ffffff !important; border-color: #e2e8f0 !important; }
+    [data-theme="light"] .req-header { background: #f1f5f9 !important; }
+    [data-theme="light"] .req-header:hover { background: #e2e8f0 !important; }
+    [data-theme="light"] .obj-row { border-color: #e2e8f0 !important; }
+    [data-theme="light"] .obj-row:hover { background: #f1f5f9 !important; }
+    [data-theme="light"] .artifact-item { background: #f1f5f9 !important; border-color: #e2e8f0 !important; }
+    [data-theme="light"] .example-artifacts { background: #f8fafc !important; border-color: #e2e8f0 !important; }
+    [data-theme="light"] .search-results { background: #ffffff !important; border-color: #e2e8f0 !important; }
+    [data-theme="light"] .sr-item:hover { background: #f1f5f9 !important; }
+    [data-theme="light"] .progress-bg { background: #e2e8f0 !important; }
+    [data-theme="light"] .stat-card { background: #ffffff !important; border-color: #e2e8f0 !important; }
+    [data-theme="light"] .hash-content .hash-val { background: #f1f5f9 !important; border-color: #e2e8f0 !important; color: #059669 !important; }
+    [data-theme="light"] .add-btn { background: #2563eb !important; }
+    [data-theme="light"] .add-btn:hover { background: #1d4ed8 !important; }
+
+    .theme-toggle { background: none; border: 1px solid #475569; color: #94a3b8; cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 0.375rem; font-size: 0.85rem; line-height: 1; }
+    .theme-toggle:hover { color: #e2e8f0; border-color: #64748b; }
+    [data-theme="light"] .theme-toggle { border-color: #cbd5e1; color: #64748b; }
+    [data-theme="light"] .theme-toggle:hover { color: #1e293b; border-color: #94a3b8; }
+</style>
+<script>
+(function() {
+    const saved = localStorage.getItem('cmmc-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    document.body.setAttribute('data-theme', saved);
+})();
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    document.body.setAttribute('data-theme', next);
+    localStorage.setItem('cmmc-theme', next);
+    document.querySelector('.theme-toggle').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+document.addEventListener('DOMContentLoaded', () => {
+    const theme = localStorage.getItem('cmmc-theme') || 'dark';
+    const btn = document.querySelector('.theme-toggle');
+    if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+});
+</script>

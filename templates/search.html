@@ -29,11 +29,12 @@
         .pending-tag { background: #422006; color: #f59e0b; padding: 0.1rem 0.4rem; border-radius: 0.2rem; font-size: 0.7rem; }
         .empty { text-align: center; color: #64748b; padding: 3rem; }
     </style>
+{% include "theme.html" %}
 </head>
 <body>
     <div class="container">
         <header>
-            <a href="/" class="back">← Back to Dashboard</a>
+            <a href="/" class="back">← Back to Dashboard</a> <button class="theme-toggle" onclick="toggleTheme()" style="float:right;">☀️</button>
             <h1>Search Objectives</h1>
         </header>
         <form class="search-box" method="GET" action="/search">

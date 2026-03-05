@@ -97,6 +97,7 @@
         .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: #7f1d1d; color: #fca5a5; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; border: 1px solid #991b1b; }
         .toast.show { opacity: 1; }
     </style>
+{% include "theme.html" %}
 </head>
 <body>
     <div class="container">
@@ -112,6 +113,7 @@
                     <input type="text" id="nav-si" placeholder="Search... ( / )" oninput="_debounceNav(this.value)" onfocus="if(this.value) _doNavSearch(this.value)" autocomplete="off">
                     <div class="search-results" id="nav-sr"></div>
                 </div>
+                <button class="theme-toggle nav-btn" onclick="toggleTheme()">☀️</button>
             </div>
         </div>
         

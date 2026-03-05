@@ -48,6 +48,7 @@
         .toggle { color: #64748b; font-size: 1.25rem; transition: transform 0.2s; }
         .toggle.open { transform: rotate(90deg); }
     </style>
+{% include "theme.html" %}
 </head>
 <body>
     <div class="container">
@@ -63,6 +64,7 @@
                     <input type="text" id="nav-si" placeholder="Search... ( / )" oninput="_debounceNav(this.value)" onfocus="if(this.value) _doNavSearch(this.value)" autocomplete="off">
                     <div class="search-results" id="nav-sr"></div>
                 </div>
+                <button class="theme-toggle nav-btn" onclick="toggleTheme()">☀️</button>
             </div>
         </div>
         {% if member['email'] %}<div style="color:#64748b;font-size:0.85rem;margin-bottom:1.5rem;">{{ member['email'] }}</div>{% endif %}

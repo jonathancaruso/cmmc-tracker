@@ -74,6 +74,7 @@
         .hash-content .dl-links { margin-top: 0.75rem; display: flex; gap: 0.5rem; }
         .hash-content .dl-links a { color: #38bdf8; font-size: 0.8rem; }
     </style>
+{% include "theme.html" %}
 </head>
 <body>
     <div class="container">
@@ -89,6 +90,7 @@
                 <button class="export-btn" onclick="hashArtifacts(this)">🔒 Hash Artifacts</button>
                 <a href="/config" class="export-btn">⚙ Config</a>
                 <a href="/api/export" class="export-btn">⬇ Export CSV</a>
+                <button class="theme-toggle export-btn" onclick="toggleTheme()">☀️</button>
             </div>
         </header>
         

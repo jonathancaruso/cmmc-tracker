@@ -41,6 +41,7 @@
         
         .empty { text-align: center; color: #64748b; padding: 2rem; font-size: 0.9rem; }
     </style>
+{% include "theme.html" %}
 </head>
 <body>
     <div class="container">
@@ -56,6 +57,7 @@
                     <input type="text" id="nav-si" placeholder="Search... ( / )" oninput="_debounceNav(this.value)" onfocus="if(this.value) _doNavSearch(this.value)" autocomplete="off">
                     <div class="search-results" id="nav-sr"></div>
                 </div>
+                <button class="theme-toggle nav-btn" onclick="toggleTheme()">☀️</button>
             </div>
         </div>
         
