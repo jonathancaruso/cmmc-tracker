@@ -1,33 +1,60 @@
 <style>
-    /* Light mode overrides */
-    [data-theme="light"] { background: #f8fafc !important; color: #1e293b !important; }
-    [data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea { background: #ffffff !important; color: #1e293b !important; border-color: #cbd5e1 !important; }
-    [data-theme="light"] input::placeholder { color: #94a3b8 !important; }
-    [data-theme="light"] .topnav .nav-btn, [data-theme="light"] .nav-btn { background: #e2e8f0 !important; color: #1e293b !important; border-color: #cbd5e1 !important; }
-    [data-theme="light"] .topnav .nav-btn:hover, [data-theme="light"] .nav-btn:hover { background: #cbd5e1 !important; }
-    [data-theme="light"] a { color: #2563eb; }
-    [data-theme="light"] a:hover { color: #1d4ed8; }
-    [data-theme="light"] table th { background: #e2e8f0 !important; color: #1e293b !important; }
-    [data-theme="light"] table td { border-color: #e2e8f0 !important; }
-    [data-theme="light"] .family-card, [data-theme="light"] .section { background: #ffffff !important; border-color: #e2e8f0 !important; }
-    [data-theme="light"] .req-header { background: #f1f5f9 !important; }
-    [data-theme="light"] .req-header:hover { background: #e2e8f0 !important; }
-    [data-theme="light"] .obj-row { border-color: #e2e8f0 !important; }
-    [data-theme="light"] .obj-row:hover { background: #f1f5f9 !important; }
-    [data-theme="light"] .artifact-item { background: #f1f5f9 !important; border-color: #e2e8f0 !important; }
-    [data-theme="light"] .example-artifacts { background: #f8fafc !important; border-color: #e2e8f0 !important; }
-    [data-theme="light"] .search-results { background: #ffffff !important; border-color: #e2e8f0 !important; }
-    [data-theme="light"] .sr-item:hover { background: #f1f5f9 !important; }
-    [data-theme="light"] .progress-bg { background: #e2e8f0 !important; }
-    [data-theme="light"] .stat-card { background: #ffffff !important; border-color: #e2e8f0 !important; }
-    [data-theme="light"] .hash-content .hash-val { background: #f1f5f9 !important; border-color: #e2e8f0 !important; color: #059669 !important; }
-    [data-theme="light"] .add-btn { background: #2563eb !important; }
-    [data-theme="light"] .add-btn:hover { background: #1d4ed8 !important; }
+    :root {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --bg-tertiary: #162032;
+        --bg-hover: #253348;
+        --bg-card: #1e293b;
+        --bg-input: #1e293b;
+        --bg-deep: #0c1425;
+        --border: #334155;
+        --border-light: #475569;
+        --text-primary: #e2e8f0;
+        --text-secondary: #cbd5e1;
+        --text-muted: #94a3b8;
+        --text-dim: #64748b;
+        --link: #38bdf8;
+        --link-hover: #7dd3fc;
+        --accent: #38bdf8;
+        --success-bg: #064e3b;
+        --success-text: #34d399;
+        --warning-bg: #422006;
+        --warning-text: #f59e0b;
+        --danger-bg: #7f1d1d;
+        --danger-text: #fca5a5;
+        --purple-bg: #3b1f5e;
+        --purple-text: #a78bfa;
+    }
 
-    .theme-toggle, .font-btn { background: none; border: 1px solid #475569; color: #94a3b8; cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 0.375rem; font-size: 0.85rem; line-height: 1; }
-    .theme-toggle:hover, .font-btn:hover { color: #e2e8f0; border-color: #64748b; }
-    [data-theme="light"] .theme-toggle, [data-theme="light"] .font-btn { border-color: #cbd5e1; color: #64748b; }
-    [data-theme="light"] .theme-toggle:hover, [data-theme="light"] .font-btn:hover { color: #1e293b; border-color: #94a3b8; }
+    [data-theme="light"] {
+        --bg-primary: #f8fafc;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #f1f5f9;
+        --bg-hover: #e2e8f0;
+        --bg-card: #ffffff;
+        --bg-input: #ffffff;
+        --bg-deep: #f8fafc;
+        --border: #e2e8f0;
+        --border-light: #cbd5e1;
+        --text-primary: #1e293b;
+        --text-secondary: #334155;
+        --text-muted: #64748b;
+        --text-dim: #94a3b8;
+        --link: #2563eb;
+        --link-hover: #1d4ed8;
+        --accent: #2563eb;
+        --success-bg: #dcfce7;
+        --success-text: #166534;
+        --warning-bg: #fef3c7;
+        --warning-text: #92400e;
+        --danger-bg: #fee2e2;
+        --danger-text: #991b1b;
+        --purple-bg: #ede9fe;
+        --purple-text: #6d28d9;
+    }
+
+    .theme-toggle, .font-btn { background: none; border: 1px solid var(--border-light); color: var(--text-muted); cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 0.375rem; font-size: 0.85rem; line-height: 1; }
+    .theme-toggle:hover, .font-btn:hover { color: var(--text-primary); border-color: var(--text-dim); }
     .font-controls { display: inline-flex; gap: 0.2rem; }
 </style>
 <script>

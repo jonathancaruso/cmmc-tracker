@@ -6,95 +6,95 @@
     <title>{{ abbr }} — {{ family }} | CMMC Tracker</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
-        
+
         header { margin-bottom: 2rem; }
-        .back { color: #94a3b8; text-decoration: none; font-size: 0.875rem; }
-        .back:hover { color: #e2e8f0; }
+        .back { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; }
+        .back:hover { color: var(--text-primary); }
         h1 { font-size: 1.5rem; margin-top: 0.5rem; }
-        h1 .badge { background: {{ color }}; color: #0f172a; font-weight: 800; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 0.25rem; vertical-align: middle; margin-right: 0.5rem; }
-        
-        .requirement { background: #1e293b; border-radius: 0.75rem; margin-bottom: 1rem; overflow: hidden; }
+        h1 .badge { background: {{ color }}; color: var(--bg-primary); font-weight: 800; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 0.25rem; vertical-align: middle; margin-right: 0.5rem; }
+
+        .requirement { background: var(--bg-secondary); border-radius: 0.75rem; margin-bottom: 1rem; overflow: hidden; }
         .req-header { padding: 1rem 1.25rem; cursor: pointer; display: flex; justify-content: space-between; align-items: start; gap: 1rem; }
-        .req-header:hover { background: #253348; }
+        .req-header:hover { background: var(--bg-hover); }
         .req-id { font-weight: 700; color: {{ color }}; white-space: nowrap; min-width: 4rem; }
-        .req-text { flex: 1; font-size: 0.9rem; color: #cbd5e1; }
-        .req-progress { font-size: 0.8rem; color: #94a3b8; white-space: nowrap; }
-        .req-toggle { color: #64748b; font-size: 1.25rem; transition: transform 0.2s; }
+        .req-text { flex: 1; font-size: 0.9rem; color: var(--text-secondary); }
+        .req-progress { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+        .req-toggle { color: var(--text-dim); font-size: 1.25rem; transition: transform 0.2s; }
         .req-toggle.open { transform: rotate(90deg); }
         .req-type-tag { font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-weight: 600; white-space: nowrap; }
-        .req-type-tag.basic { background: #1e3a5f; color: #38bdf8; }
-        .req-type-tag.derived { background: #3b1f5e; color: #c084fc; }
-        
-        .req-body { display: none; border-top: 1px solid #334155; }
+        .req-type-tag.basic { background: #1e3a5f; color: var(--link); }
+        .req-type-tag.derived { background: var(--purple-bg); color: #c084fc; }
+
+        .req-body { display: none; border-top: 1px solid var(--border); }
         .req-body.open { display: block; }
-        
-        .bulk-bar { padding: 0.5rem 1.25rem; background: #162032; display: flex; justify-content: space-between; align-items: center; }
-        .bulk-btn { background: #334155; color: #e2e8f0; border: 1px solid #475569; padding: 0.3rem 0.75rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.75rem; }
-        .bulk-btn:hover { background: #475569; }
-        
-        .methods { padding: 0.75rem 1.25rem; background: #162032; border-bottom: 1px solid #334155; }
-        .methods summary { color: #94a3b8; font-size: 0.8rem; cursor: pointer; }
-        .methods summary:hover { color: #e2e8f0; }
-        .method-block { margin-top: 0.5rem; font-size: 0.8rem; color: #64748b; line-height: 1.5; }
-        .method-block strong { color: #94a3b8; }
-        
-        .objective { padding: 0.75rem 1.25rem; border-bottom: 1px solid #1e293b; display: flex; align-items: start; gap: 0.75rem; }
+
+        .bulk-bar { padding: 0.5rem 1.25rem; background: var(--bg-tertiary); display: flex; justify-content: space-between; align-items: center; }
+        .bulk-btn { background: var(--border); color: var(--text-primary); border: 1px solid var(--border-light); padding: 0.3rem 0.75rem; border-radius: 0.375rem; cursor: pointer; font-size: 0.75rem; }
+        .bulk-btn:hover { background: var(--border-light); }
+
+        .methods { padding: 0.75rem 1.25rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); }
+        .methods summary { color: var(--text-muted); font-size: 0.8rem; cursor: pointer; }
+        .methods summary:hover { color: var(--text-primary); }
+        .method-block { margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-dim); line-height: 1.5; }
+        .method-block strong { color: var(--text-muted); }
+
+        .objective { padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--bg-secondary); display: flex; align-items: start; gap: 0.75rem; }
         .objective:last-child { border-bottom: none; }
-        .objective:hover { background: #1a2744; }
-        
+        .objective:hover { background: var(--bg-tertiary); }
+
         .obj-check { margin-top: 0.15rem; }
         .obj-check input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: {{ color }}; cursor: pointer; }
-        
-        .status-select { background: #0f172a; border: 1px solid #334155; color: #94a3b8; padding: 0.25rem 0.4rem; border-radius: 0.375rem; font-size: 0.7rem; cursor: pointer; min-width: 8rem; }
+
+        .status-select { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-muted); padding: 0.25rem 0.4rem; border-radius: 0.375rem; font-size: 0.7rem; cursor: pointer; min-width: 8rem; }
         .status-select:focus { border-color: {{ color }}; outline: none; }
-        .status-select.st-not-started { border-color: #475569; color: #94a3b8; }
+        .status-select.st-not-started { border-color: var(--border-light); color: var(--text-muted); }
         .status-select.st-in-progress { border-color: #3b82f6; color: #60a5fa; }
         .status-select.st-evidence-collected { border-color: #f59e0b; color: #fbbf24; }
-        .status-select.st-reviewed { border-color: #8b5cf6; color: #a78bfa; }
-        .status-select.st-complete { border-color: #10b981; color: #34d399; }
-        
+        .status-select.st-reviewed { border-color: #8b5cf6; color: var(--purple-text); }
+        .status-select.st-complete { border-color: #10b981; color: var(--success-text); }
+
         .obj-content { flex: 1; min-width: 0; }
         .obj-id { font-weight: 600; color: {{ color }}; font-size: 0.8rem; }
-        .obj-text { font-size: 0.875rem; color: #cbd5e1; margin-top: 0.15rem; }
+        .obj-text { font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.15rem; }
         .obj-meta { display: flex; gap: 1rem; align-items: center; margin-top: 0.5rem; }
-        .obj-notes { flex: 1; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.3rem 0.5rem; border-radius: 0.375rem; font-size: 0.8rem; }
+        .obj-notes { flex: 1; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.3rem 0.5rem; border-radius: 0.375rem; font-size: 0.8rem; }
         .obj-notes:focus { border-color: {{ color }}; outline: none; }
-        .obj-date { font-size: 0.75rem; color: #64748b; white-space: nowrap; }
-        .obj-captured { background: #064e3b; border-radius: 0.25rem; padding: 0.1rem 0.4rem; font-size: 0.7rem; color: #34d399; }
-        
+        .obj-date { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
+        .obj-captured { background: var(--success-bg); border-radius: 0.25rem; padding: 0.1rem 0.4rem; font-size: 0.7rem; color: var(--success-text); }
+
         .obj-artifacts { margin-top: 0.5rem; }
         .artifact-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.4rem; }
-        .artifact-item { display: inline-flex; align-items: center; gap: 0.3rem; background: #1e293b; border: 1px solid #334155; border-radius: 0.375rem; padding: 0.2rem 0.5rem; font-size: 0.75rem; }
-        .artifact-item a { color: #38bdf8; text-decoration: none; }
+        .artifact-item { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.375rem; padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+        .artifact-item a { color: var(--link); text-decoration: none; }
         .artifact-item a:hover { text-decoration: underline; }
-        .artifact-item .size { color: #64748b; }
-        .artifact-item .delete-artifact { color: #64748b; cursor: pointer; margin-left: 0.25rem; }
+        .artifact-item .size { color: var(--text-dim); }
+        .artifact-item .delete-artifact { color: var(--text-dim); cursor: pointer; margin-left: 0.25rem; }
         .artifact-item .delete-artifact:hover { color: #ef4444; }
         .artifact-item .preview { max-height: 2rem; border-radius: 0.2rem; margin-right: 0.25rem; }
-        .upload-btn { display: inline-flex; align-items: center; gap: 0.3rem; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 0.25rem 0.6rem; border-radius: 0.375rem; font-size: 0.75rem; cursor: pointer; }
-        .upload-btn:hover { background: #253348; color: #e2e8f0; }
-        
-        .example-artifacts { margin-top: 0.4rem; padding: 0.5rem 0.6rem; background: #0c1425; border: 1px solid #1e3a5f; border-radius: 0.375rem; font-size: 0.75rem; color: #94a3b8; line-height: 1.5; }
-        .example-artifacts summary { color: #38bdf8; cursor: pointer; font-size: 0.7rem; font-weight: 600; }
-        .example-artifacts summary:hover { color: #7dd3fc; }
-        .example-artifacts .ex-label { color: #64748b; font-weight: 600; margin-right: 0.25rem; }
-        .example-artifacts .ex-items { color: #cbd5e1; }
-        .example-artifacts .ex-source { color: #f59e0b; }
-        
+        .upload-btn { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-muted); padding: 0.25rem 0.6rem; border-radius: 0.375rem; font-size: 0.75rem; cursor: pointer; }
+        .upload-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+        .example-artifacts { margin-top: 0.4rem; padding: 0.5rem 0.6rem; background: var(--bg-deep); border: 1px solid #1e3a5f; border-radius: 0.375rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+        .example-artifacts summary { color: var(--link); cursor: pointer; font-size: 0.7rem; font-weight: 600; }
+        .example-artifacts summary:hover { color: var(--link-hover); }
+        .example-artifacts .ex-label { color: var(--text-dim); font-weight: 600; margin-right: 0.25rem; }
+        .example-artifacts .ex-items { color: var(--text-secondary); }
+        .example-artifacts .ex-source { color: var(--warning-text); }
+
         .obj-assignments { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.4rem; align-items: center; }
-        .assign-tag { display: inline-flex; align-items: center; gap: 0.25rem; background: #1e3a5f; color: #38bdf8; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; }
-        .assign-tag .remove-assign { cursor: pointer; color: #64748b; margin-left: 0.15rem; }
+        .assign-tag { display: inline-flex; align-items: center; gap: 0.25rem; background: #1e3a5f; color: var(--link); padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.7rem; }
+        .assign-tag .remove-assign { cursor: pointer; color: var(--text-dim); margin-left: 0.15rem; }
         .assign-tag .remove-assign:hover { color: #ef4444; }
-        .assign-tag .due { color: #64748b; font-size: 0.65rem; margin-left: 0.2rem; }
+        .assign-tag .due { color: var(--text-dim); font-size: 0.65rem; margin-left: 0.2rem; }
         .assign-tag .due.overdue { color: #ef4444; }
-        .assign-tag .due-input { background: #0f172a; border: 1px solid #334155; color: #94a3b8; padding: 0.1rem 0.2rem; border-radius: 0.2rem; font-size: 0.65rem; width: 6.5rem; cursor: pointer; }
+        .assign-tag .due-input { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-muted); padding: 0.1rem 0.2rem; border-radius: 0.2rem; font-size: 0.65rem; width: 6.5rem; cursor: pointer; }
         .assign-tag .due-input:focus { border-color: {{ color }}; outline: none; }
-        .assign-select { background: #0f172a; border: 1px solid #334155; color: #94a3b8; padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.7rem; cursor: pointer; }
+        .assign-select { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-muted); padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.7rem; cursor: pointer; }
         .assign-select:focus { border-color: {{ color }}; outline: none; }
-        
-        .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: #7f1d1d; color: #fca5a5; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; border: 1px solid #991b1b; }
+
+        .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: var(--danger-bg); color: var(--danger-text); padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; border: 1px solid #991b1b; }
         .toast.show { opacity: 1; }
     </style>
 {% include "theme.html" %}
@@ -117,7 +117,7 @@
                 <button class="theme-toggle nav-btn" onclick="toggleTheme()">☀️</button>
             </div>
         </div>
-        
+
         {% for req_id, req in requirements.items() %}
         <div class="requirement" id="req-{{ req_id | replace('.', '-') }}">
             <div class="req-header" onclick="toggleReq(this)">
@@ -133,21 +133,21 @@
             </div>
             <div class="req-body">
                 <div class="bulk-bar">
-                    <span style="font-size:0.8rem;color:#64748b">{{ req['objectives'] | length }} objectives</span>
+                    <span style="font-size:0.8rem;color:var(--text-dim)">{{ req['objectives'] | length }} objectives</span>
                     <div style="display:flex;gap:0.5rem;align-items:center;">
-                        <select class="bulk-assign-select" data-req-id="{{ req_id }}" onchange="bulkAssign(this, '{{ req_id }}')" style="background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:0.3rem 0.5rem;border-radius:0.375rem;font-size:0.75rem;cursor:pointer;">
+                        <select class="bulk-assign-select" data-req-id="{{ req_id }}" onchange="bulkAssign(this, '{{ req_id }}')" style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);padding:0.3rem 0.5rem;border-radius:0.375rem;font-size:0.75rem;cursor:pointer;">
                             <option value="">Assign all to...</option>
                         </select>
                         <button class="bulk-btn" onclick="bulkMark('{{ req_id }}', true, this)">✓ Mark All Complete</button>
                         <button class="bulk-btn" onclick="bulkMark('{{ req_id }}', false, this)">✗ Clear All</button>
                     </div>
                 </div>
-                
+
                 {% if req['objectives'][0].get('discussion') %}
                 <div class="methods">
                     <details>
                         <summary>Discussion</summary>
-                        <div class="method-block" style="color:#cbd5e1;">{{ req['objectives'][0]['discussion'] }}</div>
+                        <div class="method-block" style="color:var(--text-secondary);">{{ req['objectives'][0]['discussion'] }}</div>
                     </details>
                 </div>
                 {% endif %}
@@ -167,7 +167,7 @@
                     </details>
                 </div>
                 {% endif %}
-                
+
                 {% for obj in req['objectives'] %}
                 <div class="objective" id="obj-{{ obj['id'] | replace('[', '') | replace(']', '') | replace('.', '-') | replace(' ', '') }}">
                     <div class="obj-check">
@@ -216,7 +216,7 @@
                         <div class="obj-artifacts" id="artifacts-{{ obj['id'] | replace('[', '') | replace(']', '') | replace('.', '-') | replace(' ', '') | replace('\t', '') }}">
                             <div class="artifact-list" data-obj-id="{{ obj['id'] }}"></div>
                             <div class="upload-form" style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
-                                <select class="domain-select" data-obj-id="{{ obj['id'] }}" style="background:#0f172a;border:1px solid #334155;color:#94a3b8;padding:0.25rem 0.4rem;border-radius:0.375rem;font-size:0.7rem;cursor:pointer;">
+                                <select class="domain-select" data-obj-id="{{ obj['id'] }}" style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-muted);padding:0.25rem 0.4rem;border-radius:0.375rem;font-size:0.7rem;cursor:pointer;">
                                     <option value="">No domain/asset</option>
                                 </select>
                                 <label class="upload-btn">
@@ -233,7 +233,7 @@
         </div>
         {% endfor %}
     </div>
-    
+
     <div class="toast" id="toast"></div>
     <script>
     function showToast(msg) {
@@ -242,14 +242,14 @@
         t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 3000);
     }
-    
+
     function toggleReq(el) {
         const body = el.nextElementSibling;
         const toggle = el.querySelector('.req-toggle');
         body.classList.toggle('open');
         toggle.classList.toggle('open');
     }
-    
+
     const STATUS_CLASSES = {
         'Not Started': 'st-not-started',
         'In Progress': 'st-in-progress',
@@ -297,7 +297,7 @@
             capturedBadge.remove();
         }
     }
-    
+
     async function saveNotes(id, notes) {
         await fetch('/api/notes', {
             method: 'POST',
@@ -305,7 +305,7 @@
             body: JSON.stringify({id, notes})
         });
     }
-    
+
     async function bulkMark(requirementId, captured, btn) {
         btn.disabled = true;
         await fetch('/api/bulk', {
@@ -315,17 +315,17 @@
         });
         location.reload();
     }
-    
+
     function formatSize(bytes) {
         if (bytes < 1024) return bytes + ' B';
         if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
         return (bytes/1048576).toFixed(1) + ' MB';
     }
-    
+
     function isImage(name) {
         return /\.(png|jpg|jpeg|gif|webp)$/i.test(name);
     }
-    
+
     async function loadArtifacts(objId) {
         await domainsReady;
         const safeId = objId.replace(/[\[\]\s\t]/g, '');
@@ -343,25 +343,25 @@
             <span class="artifact-item" style="flex-direction:column;align-items:flex-start;padding:0.35rem 0.5rem;">
                 <span style="display:flex;align-items:center;gap:0.3rem;">
                     ${isImage(a.original_name) ? `<img src="/uploads/${a.filename}" class="preview">` : ''}
-                     
+
                     <a href="/uploads/${a.filename}" target="_blank" style="font-weight:600;">${displayName}</a>
-                    <select class="domain-select" style="font-size:0.65rem;background:#0f172a;border:1px solid #334155;border-radius:0.25rem;color:#e2e8f0;padding:0.1rem 0.2rem;" onchange="updateArtifactDomain(${a.id}, this.value, '${objId}')">
+                    <select class="domain-select" style="font-size:0.65rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:0.25rem;color:var(--text-primary);padding:0.1rem 0.2rem;" onchange="updateArtifactDomain(${a.id}, this.value, '${objId}')">
                         <option value="">No tag</option>
                         ${domainCache.map(d => `<option value="${d.id}" ${a.domain_id == d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
                     </select>
                     <span class="delete-artifact" onclick="deleteArtifact(${a.id}, '${objId}')" title="Delete">✕</span>
                 </span>
-                <span style="color:#64748b;font-size:0.65rem;">
+                <span style="color:var(--text-dim);font-size:0.65rem;">
                     ${a.original_name !== displayName ? `orig: ${a.original_name} · ` : ''}${meta.join(' · ')}
                 </span>
                 <input type="text" class="obj-notes" placeholder="How was this obtained?"
                        value="${(a.obtained_method || '').replace(/"/g, '&quot;')}"
                        onblur="saveObtained(${a.id}, this.value)"
-                       style="width:100%;margin-top:0.2rem;font-size:0.65rem;background:#0f172a;border:1px solid #334155;border-radius:0.25rem;color:#e2e8f0;padding:0.2rem 0.4rem;">
+                       style="width:100%;margin-top:0.2rem;font-size:0.65rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:0.25rem;color:var(--text-primary);padding:0.2rem 0.4rem;">
             </span>`;
         }).join('');
     }
-    
+
     async function handleFileSelect(input, objId) {
         if (!input.files.length) return;
 
@@ -386,13 +386,13 @@
             alert('Upload failed: ' + err.message);
         }
     }
-    
+
     async function deleteArtifact(id, objId) {
         if (!confirm('Delete this artifact?')) return;
         await fetch(`/api/artifacts/delete/${id}`, { method: 'POST' });
         loadArtifacts(objId);
     }
-    
+
     // Team members cache
     let teamMembers = [];
     async function loadTeam() {
@@ -458,7 +458,7 @@
             loadAssignments(tag.dataset.objId);
         });
     }
-    
+
     async function loadAssignments(objId) {
         const container = document.querySelector(`.assign-tags[data-obj-id="${objId}"]`);
         if (!container) return;
@@ -469,14 +469,14 @@
             const overdue = a.due_date && a.due_date < today ? 'overdue' : '';
             return `<span class="assign-tag">
                 👤 ${a.member_name}
-                <input type="date" class="due-input" value="${a.due_date || ''}" 
+                <input type="date" class="due-input" value="${a.due_date || ''}"
                        onchange="setDueDate(${a.id}, this.value, '${objId}')" title="Due date">
                 ${a.due_date && overdue ? '<span class="due overdue">OVERDUE</span>' : ''}
                 <span class="remove-assign" onclick="removeAssignment(${a.id}, '${objId}')" title="Remove">✕</span>
             </span>`;
         }).join('');
     }
-    
+
     async function assignMember(select, objId) {
         const memberId = select.value;
         if (!memberId) return;
@@ -488,12 +488,12 @@
         select.value = '';
         loadAssignments(objId);
     }
-    
+
     async function removeAssignment(id, objId) {
         await fetch(`/api/assignments/${id}`, { method: 'DELETE' });
         loadAssignments(objId);
     }
-    
+
     async function setDueDate(assignmentId, date, objId) {
         await fetch(`/api/assignments/${assignmentId}/due`, {
             method: 'PATCH',
@@ -502,7 +502,7 @@
         });
         loadAssignments(objId);
     }
-    
+
     // Auto-open and scroll to requirement from search
     (function() {
         const target = sessionStorage.getItem('openReq') || location.hash.replace('#', '');
@@ -516,7 +516,7 @@
             }
         }
     })();
-    
+
     // Load artifacts and assignments for all visible objectives when a requirement is expanded
     const origToggle = toggleReq;
     toggleReq = function(el) {

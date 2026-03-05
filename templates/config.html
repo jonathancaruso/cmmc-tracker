@@ -6,40 +6,40 @@
     <title>Config | CMMC Tracker</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
-        
+
         header { margin-bottom: 2rem; }
-        .back { color: #94a3b8; text-decoration: none; font-size: 0.875rem; }
-        .back:hover { color: #e2e8f0; }
+        .back { color: var(--text-muted); text-decoration: none; font-size: 0.875rem; }
+        .back:hover { color: var(--text-primary); }
         h1 { font-size: 1.5rem; margin-top: 0.5rem; }
-        h1 span { color: #94a3b8; font-weight: 400; font-size: 1rem; }
-        
-        .section { background: #1e293b; border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
-        .section h2 { font-size: 1.125rem; margin-bottom: 1rem; color: #f8fafc; }
-        
+        h1 span { color: var(--text-muted); font-weight: 400; font-size: 1rem; }
+
+        .section { background: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .section h2 { font-size: 1.125rem; margin-bottom: 1rem; }
+
         .add-form { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
-        .add-form input { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; }
-        .add-form input:focus { border-color: #38bdf8; outline: none; }
+        .add-form input { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.5rem 0.75rem; border-radius: 0.375rem; font-size: 0.875rem; }
+        .add-form input:focus { border-color: var(--accent); outline: none; }
         .add-form input[name="name"] { flex: 1; min-width: 150px; }
         .add-form input[name="role"] { width: 160px; }
         .add-form input[name="email"] { width: 220px; }
-        .add-btn { background: #38bdf8; color: #0f172a; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
-        .add-btn:hover { background: #7dd3fc; }
-        
+        .add-btn { background: var(--accent); color: var(--bg-primary); border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+        .add-btn:hover { background: var(--link-hover); }
+
         table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; }
-        td { padding: 0.75rem; border-bottom: 1px solid #1e293b; font-size: 0.875rem; }
-        tr:hover td { background: #253348; }
-        .role-tag { background: #334155; color: #94a3b8; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }
-        .count-tag { background: #1e3a5f; color: #38bdf8; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }
-        .email-text { color: #64748b; font-size: 0.8rem; }
+        th { text-align: left; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+        td { padding: 0.75rem; border-bottom: 1px solid var(--bg-secondary); font-size: 0.875rem; }
+        tr:hover td { background: var(--bg-hover); }
+        .role-tag { background: var(--border); color: var(--text-muted); padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }
+        .count-tag { background: #1e3a5f; color: var(--link); padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; }
+        .email-text { color: var(--text-dim); font-size: 0.8rem; }
         .actions { display: flex; gap: 0.5rem; }
-        .action-btn { background: none; border: 1px solid #334155; color: #94a3b8; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer; }
-        .action-btn:hover { background: #334155; color: #e2e8f0; }
-        .action-btn.danger:hover { background: #7f1d1d; color: #fca5a5; border-color: #7f1d1d; }
-        
-        .empty { text-align: center; color: #64748b; padding: 2rem; font-size: 0.9rem; }
+        .action-btn { background: none; border: 1px solid var(--border); color: var(--text-muted); padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; cursor: pointer; }
+        .action-btn:hover { background: var(--border); color: var(--text-primary); }
+        .action-btn.danger:hover { background: var(--danger-bg); color: var(--danger-text); border-color: var(--danger-bg); }
+
+        .empty { text-align: center; color: var(--text-dim); padding: 2rem; font-size: 0.9rem; }
     </style>
 {% include "theme.html" %}
 </head>
@@ -61,18 +61,18 @@
                 <button class="theme-toggle nav-btn" onclick="toggleTheme()">☀️</button>
             </div>
         </div>
-        
+
         <div class="section">
             <h2>Team Members</h2>
-            <p style="color:#94a3b8;font-size:0.85rem;margin-bottom:1rem;">Add people who can be assigned artifact collection responsibilities.</p>
-            
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">Add people who can be assigned artifact collection responsibilities.</p>
+
             <form class="add-form" onsubmit="addMember(event)">
                 <input type="text" name="name" placeholder="Name" required>
                 <input type="text" name="role" placeholder="Role (e.g. IT Admin)">
                 <input type="email" name="email" placeholder="Email (optional)">
                 <button type="submit" class="add-btn">+ Add Member</button>
             </form>
-            
+
             {% if members %}
             <table>
                 <thead>
@@ -87,8 +87,8 @@
                 <tbody>
                     {% for m in members %}
                     <tr id="member-{{ m['id'] }}">
-                        <td><a href="/member/{{ m['id'] }}" style="color:#38bdf8;text-decoration:none;font-weight:600;">{{ m['name'] }}</a></td>
-                        <td>{% if m['role'] %}<span class="role-tag">{{ m['role'] }}</span>{% else %}<span style="color:#475569">—</span>{% endif %}</td>
+                        <td><a href="/member/{{ m['id'] }}" style="color:var(--link);text-decoration:none;font-weight:600;">{{ m['name'] }}</a></td>
+                        <td>{% if m['role'] %}<span class="role-tag">{{ m['role'] }}</span>{% else %}<span style="color:var(--border-light)">—</span>{% endif %}</td>
                         <td><span class="email-text">{{ m['email'] or '—' }}</span></td>
                         <td><span class="count-tag">{{ counts.get(m['id'], 0) }} assigned</span></td>
                         <td>
@@ -104,14 +104,14 @@
             <div class="empty">No team members yet. Add someone above to start assigning artifacts.</div>
             {% endif %}
         </div>
-        
+
         <div class="section">
             <h2>Domains & Assets</h2>
-            <p style="color:#94a3b8;font-size:0.85rem;margin-bottom:1rem;">Domains or assets to tag artifacts by source.</p>
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">Domains or assets to tag artifacts by source.</p>
 
             <form class="add-form" onsubmit="addDomain(event)">
                 <input type="text" name="name" placeholder="Domain or asset name" required>
-                <input type="color" name="color" value="#6366f1" style="width:3rem;height:2.25rem;padding:0.15rem;background:#0f172a;border:1px solid #334155;border-radius:0.375rem;cursor:pointer;">
+                <input type="color" name="color" value="#6366f1" style="width:3rem;height:2.25rem;padding:0.15rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:0.375rem;cursor:pointer;">
                 <button type="submit" class="add-btn">+ Add Domain / Asset</button>
             </form>
 
@@ -149,15 +149,15 @@
 
         <div class="section">
             <h2>About</h2>
-            <p style="color:#94a3b8;font-size:0.85rem;line-height:1.6;">
+            <p style="color:var(--text-muted);font-size:0.85rem;line-height:1.6;">
                 CMMC Artifact Tracker tracks assessment objective completion for NIST 800-171 Rev 2.<br>
                 14 control families · 110 security requirements · 320 assessment objectives<br>
                 Data seeded from SP 800-171A with discussions from SP 800-171. All data stored locally in SQLite.<br>
-                Artifacts stored in <code style="background:#334155;padding:0.1rem 0.3rem;border-radius:0.2rem;font-size:0.8rem;">data/uploads/</code>
+                Artifacts stored in <code style="background:var(--border);padding:0.1rem 0.3rem;border-radius:0.2rem;font-size:0.8rem;">data/uploads/</code>
             </p>
         </div>
     </div>
-    
+
     <script>
     async function addMember(e) {
         e.preventDefault();
@@ -175,7 +175,7 @@
         });
         location.reload();
     }
-    
+
     async function deleteMember(id, name) {
         if (!confirm(`Delete ${name}? This will also remove all their assignments.`)) return;
         await fetch(`/api/team/${id}`, { method: 'DELETE' });
