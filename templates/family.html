@@ -324,6 +324,7 @@
     }
     
     async function loadArtifacts(objId) {
+        await domainsReady;
         const safeId = objId.replace(/[\[\]\s\t]/g, '');
         const container = document.querySelector(`.artifact-list[data-obj-id="${objId}"]`);
         if (!container) return;
@@ -412,7 +413,8 @@
             sel.innerHTML = '<option value="">No domain/asset</option>' + opts;
         });
     }
-    loadDomains();
+    // Ensure domains are loaded before anything else
+    const domainsReady = loadDomains();
 
     async function updateArtifactDomain(artifactId, domainId, objId) {
         await fetch(`/api/artifacts/${artifactId}/domain`, {
