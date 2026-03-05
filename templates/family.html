@@ -339,8 +339,12 @@
             <span class="artifact-item" style="flex-direction:column;align-items:flex-start;padding:0.35rem 0.5rem;">
                 <span style="display:flex;align-items:center;gap:0.3rem;">
                     ${isImage(a.original_name) ? `<img src="/uploads/${a.filename}" class="preview">` : ''}
-                    ${a.domain_name ? `<span class="domain-badge" style="background:${a.domain_color || '#334155'};color:#fff;padding:0.1rem 0.35rem;border-radius:0.2rem;font-size:0.6rem;font-weight:600;">${a.domain_name}</span>` : ''}
+                     
                     <a href="/uploads/${a.filename}" target="_blank" style="font-weight:600;">${displayName}</a>
+                    <select class="domain-select" style="font-size:0.65rem;background:#0f172a;border:1px solid #334155;border-radius:0.25rem;color:#e2e8f0;padding:0.1rem 0.2rem;" onchange="updateArtifactDomain(${a.id}, this.value, '${objId}')">
+                        <option value="">No tag</option>
+                        ${domainCache.map(d => `<option value="${d.id}" ${a.domain_id == d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
+                    </select>
                     <span class="delete-artifact" onclick="deleteArtifact(${a.id}, '${objId}')" title="Delete">✕</span>
                 </span>
                 <span style="color:#64748b;font-size:0.65rem;">
@@ -399,15 +403,25 @@
     loadTeam();
 
     // Load domains for upload dropdowns
+    let domainCache = [];
     async function loadDomains() {
         const res = await fetch('/api/domains');
-        const domains = await res.json();
-        const opts = domains.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
-        document.querySelectorAll('.domain-select').forEach(sel => {
+        domainCache = await res.json();
+        const opts = domainCache.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+        document.querySelectorAll('.upload-form .domain-select').forEach(sel => {
             sel.innerHTML = '<option value="">No domain/asset</option>' + opts;
         });
     }
     loadDomains();
+
+    async function updateArtifactDomain(artifactId, domainId, objId) {
+        await fetch(`/api/artifacts/${artifactId}/domain`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ domain_id: domainId || null })
+        });
+        loadArtifacts(objId);
+    }
 
     async function bulkAssign(select, reqId) {
         const memberId = select.value;

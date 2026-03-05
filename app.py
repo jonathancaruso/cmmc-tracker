@@ -866,6 +866,48 @@ def delete_artifact(artifact_id):
     return jsonify({"ok": True})
 
 
+@app.route("/api/artifacts/<int:artifact_id>/domain", methods=["PATCH"])
+def update_artifact_domain(artifact_id):
+    data = request.json
+    domain_id = data.get("domain_id") or None
+    if domain_id:
+        domain_id = int(domain_id)
+
+    conn = get_db()
+    row = conn.execute("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+
+    old_filepath = os.path.join(UPLOAD_DIR, row["filename"])
+    ext = os.path.splitext(row["filename"])[1]
+
+    # Look up domain name
+    domain_name = ""
+    if domain_id:
+        d = conn.execute("SELECT name FROM domains WHERE id = ?", (domain_id,)).fetchone()
+        if d:
+            domain_name = d["name"]
+
+    # Generate new filename
+    new_basename = _generate_artifact_filename(conn, row["objective_id"], domain_name, ext)
+    safe_id = row["objective_id"].replace("[", "").replace("]", "").replace(" ", "").replace("\t", "")
+    new_filename = f"{safe_id}/{new_basename}"
+    new_filepath = os.path.join(UPLOAD_DIR, new_filename)
+
+    # Rename physical file
+    if os.path.exists(old_filepath):
+        os.makedirs(os.path.dirname(new_filepath), exist_ok=True)
+        os.rename(old_filepath, new_filepath)
+
+    # Update DB
+    conn.execute("UPDATE artifacts SET domain_id = ?, filename = ? WHERE id = ?",
+                 (domain_id, new_filename, artifact_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "filename": new_filename})
+
+
 @app.route("/uploads/<path:filename>")
 def serve_upload(filename):
     from flask import send_from_directory
