@@ -96,6 +96,11 @@
             <h2>Overall Progress</h2>
             <div class="stats">
                 <div class="big-num">{{ totals['captured'] or 0 }} <small>/ {{ totals['total'] }}</small></div>
+                <div style="text-align:center;">
+                    <div style="font-size:1.5rem;font-weight:700;color:#a78bfa;">{{ totals['artifact_count'] or 0 }}</div>
+                    <div style="font-size:0.75rem;color:#94a3b8;">artifacts uploaded</div>
+                    <div style="font-size:0.7rem;color:#64748b;">{{ totals['objectives_with_evidence'] or 0 }} objectives covered</div>
+                </div>
                 <div style="flex:1">
                     {% set pct = ((totals['captured'] or 0) / totals['total'] * 100) | round(1) if totals['total'] > 0 else 0 %}
                     <div class="progress-bar"><div class="progress-fill" style="width:{{ pct }}%"></div></div>
@@ -130,7 +135,10 @@
                 </div>
                 <div class="name">{{ f['family'] }}</div>
                 <div class="bar"><div class="bar-fill" style="width:{{ fpct }}%"></div></div>
-                <div class="pct">{{ fpct }}%</div>
+                <div style="display:flex;justify-content:space-between;margin-top:0.25rem;">
+                    <span style="font-size:0.7rem;color:#a78bfa;">📎 {{ f['artifact_count'] or 0 }} files ({{ f['objectives_with_evidence'] or 0 }} obj)</span>
+                    <span class="pct" style="margin:0;">{{ fpct }}%</span>
+                </div>
             </a>
             {% endfor %}
         </div>

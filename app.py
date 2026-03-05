@@ -261,21 +261,28 @@ FAMILY_COLORS = {
 def dashboard():
     conn = get_db()
     families = conn.execute("""
-        SELECT family, 
+        SELECT o.family, 
                COUNT(*) as total,
-               SUM(CASE WHEN captured = 1 THEN 1 ELSE 0 END) as captured,
-               SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
-               SUM(CASE WHEN status = 'Evidence Collected' THEN 1 ELSE 0 END) as evidence_collected,
-               SUM(CASE WHEN status = 'Reviewed' THEN 1 ELSE 0 END) as reviewed
-        FROM objectives GROUP BY family ORDER BY family
+               SUM(CASE WHEN o.captured = 1 THEN 1 ELSE 0 END) as captured,
+               SUM(CASE WHEN o.status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
+               SUM(CASE WHEN o.status = 'Evidence Collected' THEN 1 ELSE 0 END) as evidence_collected,
+               SUM(CASE WHEN o.status = 'Reviewed' THEN 1 ELSE 0 END) as reviewed,
+               COUNT(DISTINCT a.objective_id) as objectives_with_evidence,
+               COALESCE(SUM(CASE WHEN a.id IS NOT NULL THEN 1 ELSE 0 END), 0) as artifact_count
+        FROM objectives o
+        LEFT JOIN artifacts a ON o.id = a.objective_id
+        GROUP BY o.family ORDER BY o.family
     """).fetchall()
     totals = conn.execute("""
         SELECT COUNT(*) as total,
-               SUM(CASE WHEN captured = 1 THEN 1 ELSE 0 END) as captured,
-               SUM(CASE WHEN status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
-               SUM(CASE WHEN status = 'Evidence Collected' THEN 1 ELSE 0 END) as evidence_collected,
-               SUM(CASE WHEN status = 'Reviewed' THEN 1 ELSE 0 END) as reviewed
-        FROM objectives
+               SUM(CASE WHEN o.captured = 1 THEN 1 ELSE 0 END) as captured,
+               SUM(CASE WHEN o.status = 'In Progress' THEN 1 ELSE 0 END) as in_progress,
+               SUM(CASE WHEN o.status = 'Evidence Collected' THEN 1 ELSE 0 END) as evidence_collected,
+               SUM(CASE WHEN o.status = 'Reviewed' THEN 1 ELSE 0 END) as reviewed,
+               COUNT(DISTINCT a.objective_id) as objectives_with_evidence,
+               COALESCE(SUM(CASE WHEN a.id IS NOT NULL THEN 1 ELSE 0 END), 0) as artifact_count
+        FROM objectives o
+        LEFT JOIN artifacts a ON o.id = a.objective_id
     """).fetchone()
     conn.close()
     return render_template("dashboard.html",
