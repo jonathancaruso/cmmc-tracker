@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POA&M — CMMC Artifact Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f172a; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        h1 { font-size: 1.5rem; font-weight: 700; }
+        h1 span { color: #94a3b8; font-weight: 400; font-size: 0.9rem; margin-left: 0.5rem; }
+        .btn { background: #334155; color: #e2e8f0; border: 1px solid #475569; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.875rem; text-decoration: none; }
+        .btn:hover { background: #475569; }
+        .header-links { display: flex; gap: 0.5rem; }
+
+        .summary { display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .stat-card { background: #1e293b; border-radius: 0.75rem; padding: 1.25rem 1.5rem; min-width: 160px; }
+        .stat-card .num { font-size: 2rem; font-weight: 800; }
+        .stat-card .label { font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem; }
+        .stat-high { color: #ef4444; }
+        .stat-mod { color: #f59e0b; }
+        .stat-low { color: #34d399; }
+        .stat-blue { color: #38bdf8; }
+
+        .filter-bar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .filter-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 0.35rem 0.75rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.8rem; }
+        .filter-btn.active { background: #334155; color: #e2e8f0; border-color: #475569; }
+
+        .poam-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .poam-table th { background: #1e293b; color: #94a3b8; text-align: left; padding: 0.75rem 0.5rem; position: sticky; top: 0; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .poam-table td { padding: 0.5rem; border-bottom: 1px solid #1e293b; vertical-align: top; }
+        .poam-table tr:hover { background: #1e293b; }
+        .poam-table .obj-id { color: #38bdf8; font-weight: 700; white-space: nowrap; font-size: 0.75rem; }
+        .poam-table .family-tag { font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 0.2rem; font-weight: 700; white-space: nowrap; }
+        .poam-table .obj-text { color: #cbd5e1; max-width: 250px; }
+        .poam-table .status-badge { font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 0.2rem; white-space: nowrap; }
+
+        .risk-high { background: #450a0a; color: #ef4444; }
+        .risk-moderate { background: #422006; color: #f59e0b; }
+        .risk-low { background: #052e16; color: #34d399; }
+
+        .inline-input { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 0.3rem 0.4rem; border-radius: 0.25rem; font-size: 0.75rem; width: 100%; }
+        .inline-input:focus { border-color: #38bdf8; outline: none; }
+        textarea.inline-input { resize: vertical; min-height: 2.5rem; }
+        select.inline-input { cursor: pointer; }
+
+        .save-indicator { color: #34d399; font-size: 0.65rem; opacity: 0; transition: opacity 0.3s; }
+        .save-indicator.show { opacity: 1; }
+
+        .toast { position: fixed; bottom: 2rem; right: 2rem; background: #065f46; color: #34d399; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.85rem; z-index: 200; display: none; }
+        .toast.show { display: block; }
+
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #64748b; }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>POA&M Generator <span>Plan of Action & Milestones</span></h1>
+            <div class="header-links">
+                <a href="/" class="btn">← Dashboard</a>
+                <a href="/api/poam/export" class="btn">⬇ Export POA&M CSV</a>
+            </div>
+        </header>
+
+        <div class="summary">
+            <div class="stat-card">
+                <div class="num stat-blue">{{ total }}</div>
+                <div class="label">Incomplete Objectives</div>
+            </div>
+            <div class="stat-card">
+                <div class="num" style="color:#a78bfa;">{{ with_plan }}</div>
+                <div class="label">With Remediation Plan</div>
+            </div>
+            <div class="stat-card">
+                <div class="num stat-high">{{ by_risk.get('High', 0) }}</div>
+                <div class="label">High Risk</div>
+            </div>
+            <div class="stat-card">
+                <div class="num stat-mod">{{ by_risk.get('Moderate', 0) }}</div>
+                <div class="label">Moderate Risk</div>
+            </div>
+            <div class="stat-card">
+                <div class="num stat-low">{{ by_risk.get('Low', 0) }}</div>
+                <div class="label">Low Risk</div>
+            </div>
+        </div>
+
+        <div class="filter-bar">
+            <button class="filter-btn active" onclick="filterRisk('all',this)">All ({{ total }})</button>
+            <button class="filter-btn" onclick="filterRisk('High',this)">High Risk</button>
+            <button class="filter-btn" onclick="filterRisk('Moderate',this)">Moderate</button>
+            <button class="filter-btn" onclick="filterRisk('Low',this)">Low</button>
+            <button class="filter-btn" onclick="filterRisk('no-plan',this)">No Plan Yet</button>
+        </div>
+
+        {% if items %}
+        <div style="overflow-x:auto;">
+        <table class="poam-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Family</th>
+                    <th>Objective</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Risk</th>
+                    <th>Weakness</th>
+                    <th>Remediation Plan</th>
+                    <th>Resources</th>
+                    <th>Milestone</th>
+                    <th>Responsible</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr data-obj="{{ item['id'] }}" data-risk="{{ item['risk_level'] or 'Moderate' }}" data-has-plan="{{ '1' if item['remediation'] else '0' }}">
+                    <td style="color:#64748b;">{{ loop.index }}</td>
+                    <td>
+                        {% set fab = abbr.get(item['family'], '??') %}
+                        <span class="family-tag" style="background:{{ colors.get(fab, '#6366f1') }}22;color:{{ colors.get(fab, '#6366f1') }};">{{ fab }}</span>
+                    </td>
+                    <td class="obj-id">{{ item['id'] }}</td>
+                    <td class="obj-text">{{ item['assessment_objective'][:120] }}{% if item['assessment_objective']|length > 120 %}...{% endif %}</td>
+                    <td><span class="status-badge" style="background:#1e293b;color:#94a3b8;">{{ item['status'] or 'Not Started' }}</span></td>
+                    <td>
+                        <select class="inline-input" style="width:90px;" onchange="savePoam('{{ item['id'] }}', this.closest('tr'))">
+                            <option value="High" {% if item['risk_level'] == 'High' %}selected{% endif %}>High</option>
+                            <option value="Moderate" {% if (item['risk_level'] or 'Moderate') == 'Moderate' %}selected{% endif %}>Moderate</option>
+                            <option value="Low" {% if item['risk_level'] == 'Low' %}selected{% endif %}>Low</option>
+                        </select>
+                    </td>
+                    <td><textarea class="inline-input" placeholder="Describe weakness..." onchange="savePoam('{{ item['id'] }}', this.closest('tr'))">{{ item['weakness'] or '' }}</textarea></td>
+                    <td><textarea class="inline-input" placeholder="Remediation steps..." onchange="savePoam('{{ item['id'] }}', this.closest('tr'))">{{ item['remediation'] or '' }}</textarea></td>
+                    <td><input class="inline-input" placeholder="Resources..." value="{{ item['resources'] or '' }}" onchange="savePoam('{{ item['id'] }}', this.closest('tr'))"></td>
+                    <td><input type="date" class="inline-input" style="width:130px;" value="{{ item['milestone_date'] or '' }}" onchange="savePoam('{{ item['id'] }}', this.closest('tr'))"></td>
+                    <td style="font-size:0.7rem;color:#94a3b8;">{{ item['assigned_to'] or 'Unassigned' }}</td>
+                    <td><span class="save-indicator" id="saved-{{ loop.index }}">✓</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">🎉</div>
+            <h2>All objectives complete!</h2>
+            <p>No POA&M entries needed — every objective has been captured.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="toast" id="toast">Saved</div>
+
+    <script>
+    let saveTimers = {};
+
+    async function savePoam(objId, row) {
+        const cells = row.querySelectorAll('.inline-input');
+        const data = {
+            objective_id: objId,
+            risk_level: cells[0].value,
+            weakness: cells[1].value,
+            remediation: cells[2].value,
+            resources: cells[3].value,
+            milestone_date: cells[4].value || null
+        };
+        // Update data attribute for filtering
+        row.dataset.risk = data.risk_level;
+        row.dataset.hasPlan = data.remediation ? '1' : '0';
+
+        try {
+            const res = await fetch('/api/poam', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if (res.ok) {
+                showToast('Saved');
+            }
+        } catch(e) {
+            showToast('Save failed!');
+        }
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 1500);
+    }
+
+    function filterRisk(mode, btn) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.poam-table tbody tr').forEach(row => {
+            if (mode === 'all') { row.style.display = ''; }
+            else if (mode === 'no-plan') { row.style.display = row.dataset.hasPlan === '0' ? '' : 'none'; }
+            else { row.style.display = row.dataset.risk === mode ? '' : 'none'; }
+        });
+    }
+    </script>
+</body>
+</html>

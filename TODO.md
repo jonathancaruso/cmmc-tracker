@@ -22,7 +22,7 @@
 
 ## Backlog (Priority Order)
 - [x] Artifact count on dashboard cards (evidence attached vs total objectives)
-- [ ] POA&M generator — auto-generate Plan of Action & Milestones for incomplete objectives
+- [x] POA&M generator — auto-generate Plan of Action & Milestones for incomplete objectives
 - [ ] Evidence mapping — link one artifact to multiple objectives
 - [ ] Comments/activity log per objective
 - [ ] Print/PDF assessment report

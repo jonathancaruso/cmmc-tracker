@@ -87,6 +87,7 @@
                            oninput="debounceSearch(this.value)" onfocus="if(this.value) doSearch(this.value)" autocomplete="off">
                     <div class="search-results" id="search-results"></div>
                 </div>
+                <a href="/poam" class="export-btn">📋 POA&M</a>
                 <button class="export-btn" onclick="hashArtifacts(this)">🔒 Hash Artifacts</button>
                 {% if current_user and current_user.role == 'admin' %}<a href="/config" class="export-btn">⚙ Config</a>{% endif %}
                 <a href="/api/export" class="export-btn">⬇ Export CSV</a>
