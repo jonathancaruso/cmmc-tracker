@@ -1295,4 +1295,4 @@ if __name__ == "__main__":
             pass
 
     debug = os.environ.get("FLASK_DEBUG", "1") == "1"
-    app.run(host="0.0.0.0", port=3300, debug=debug)
+    app.run(host="0.0.0.0", port=8888, debug=debug)
