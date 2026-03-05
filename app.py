@@ -27,7 +27,25 @@ def get_db():
 
 def init_db():
     conn = get_db()
-    # Always ensure artifacts table exists (even on existing DBs)
+    # Create all tables
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS objectives (
+            id TEXT PRIMARY KEY,
+            family TEXT NOT NULL,
+            requirement_id TEXT NOT NULL,
+            sort_as TEXT,
+            security_requirement TEXT,
+            assessment_objective TEXT,
+            examine TEXT,
+            interview TEXT,
+            test TEXT,
+            captured INTEGER DEFAULT 0,
+            artifact_notes TEXT DEFAULT '',
+            captured_date TEXT,
+            requirement_type TEXT DEFAULT '',
+            discussion TEXT DEFAULT ''
+        )
+    """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS artifacts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,73 +80,41 @@ def init_db():
         )
     """)
     conn.commit()
-    conn.close()
 
-    # Migrate: add columns if they don't exist
-    try:
-        conn2 = get_db()
-        conn2.execute("SELECT requirement_type FROM objectives LIMIT 1")
-        conn2.close()
-    except Exception:
-        conn2 = get_db()
+    # Migrate existing DBs: add columns if they don't exist
+    for col in ["requirement_type", "discussion"]:
         try:
-            conn2.execute("ALTER TABLE objectives ADD COLUMN requirement_type TEXT DEFAULT ''")
+            conn.execute(f"SELECT {col} FROM objectives LIMIT 1")
         except Exception:
-            pass
-        try:
-            conn2.execute("ALTER TABLE objectives ADD COLUMN discussion TEXT DEFAULT ''")
-        except Exception:
-            pass
-        conn2.commit()
-        conn2.close()
-
-    # Seed discussion and requirement_type from SP 800-171 xlsx
-    if os.path.exists(XLSX_171_PATH):
-        conn2 = get_db()
-        # Check if already seeded
-        sample = conn2.execute("SELECT discussion FROM objectives WHERE requirement_id = '3.1.1' LIMIT 1").fetchone()
-        if sample and not sample["discussion"]:
-            wb2 = load_workbook(XLSX_171_PATH, read_only=True)
-            ws2 = wb2["SP 800-171"]
-            for row in ws2.iter_rows(min_row=2, values_only=True):
-                req_id = str(row[2] or "").strip()
-                req_type = str(row[1] or "").strip()
-                discussion = str(row[5] or "").strip()
-                if req_id:
-                    conn2.execute(
-                        "UPDATE objectives SET requirement_type = ?, discussion = ? WHERE requirement_id = ?",
-                        (req_type, discussion, req_id)
-                    )
-            conn2.commit()
-            wb2.close()
-        conn2.close()
+            try:
+                conn.execute(f"ALTER TABLE objectives ADD COLUMN {col} TEXT DEFAULT ''")
+            except Exception:
+                pass
+    conn.commit()
 
     # Check if objectives already seeded
-    try:
-        c = get_db()
-        count = c.execute("SELECT COUNT(*) FROM objectives").fetchone()[0]
-        c.close()
-        if count > 0:
-            return
-    except Exception:
-        pass
-    conn = get_db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS objectives (
-            id TEXT PRIMARY KEY,
-            family TEXT NOT NULL,
-            requirement_id TEXT NOT NULL,
-            sort_as TEXT,
-            security_requirement TEXT,
-            assessment_objective TEXT,
-            examine TEXT,
-            interview TEXT,
-            test TEXT,
-            captured INTEGER DEFAULT 0,
-            artifact_notes TEXT DEFAULT '',
-            captured_date TEXT
-        )
-    """)
+    count = conn.execute("SELECT COUNT(*) FROM objectives").fetchone()[0]
+    if count > 0:
+        # Seed discussion if missing
+        if os.path.exists(XLSX_171_PATH):
+            sample = conn.execute("SELECT discussion FROM objectives WHERE requirement_id = '3.1.1' LIMIT 1").fetchone()
+            if sample and not sample["discussion"]:
+                wb2 = load_workbook(XLSX_171_PATH, read_only=True)
+                ws2 = wb2["SP 800-171"]
+                for row in ws2.iter_rows(min_row=2, values_only=True):
+                    req_id = str(row[2] or "").strip()
+                    req_type = str(row[1] or "").strip()
+                    discussion = str(row[5] or "").strip()
+                    if req_id:
+                        conn.execute(
+                            "UPDATE objectives SET requirement_type = ?, discussion = ? WHERE requirement_id = ?",
+                            (req_type, discussion, req_id)
+                        )
+                conn.commit()
+                wb2.close()
+        conn.close()
+        return
+
     # Parse xlsx — two passes: collect all rows, then insert
     wb = load_workbook(XLSX_PATH, read_only=True)
     ws = wb["SP800-171A"]
@@ -203,9 +189,36 @@ def init_db():
             ))
 
     conn.commit()
-    conn.close()
     wb.close()
     print(f"Database seeded from {XLSX_PATH}")
+
+    # Now seed discussion and requirement_type from SP 800-171
+    if os.path.exists(XLSX_171_PATH):
+        wb2 = load_workbook(XLSX_171_PATH, read_only=True)
+        ws2 = wb2["SP 800-171"]
+        for row in ws2.iter_rows(min_row=2, values_only=True):
+            req_id = str(row[2] or "").strip()
+            req_type = str(row[1] or "").strip()
+            sec_req = str(row[4] or "").strip()
+            discussion = str(row[5] or "").strip()
+            if req_id:
+                conn.execute(
+                    "UPDATE objectives SET requirement_type = ?, discussion = ? WHERE requirement_id = ?",
+                    (req_type, discussion, req_id)
+                )
+                # Backfill missing security_requirement text
+                if sec_req:
+                    import re
+                    sec_req_clean = re.sub(r'\[\d+\]\.?', '', sec_req).strip()
+                    conn.execute(
+                        "UPDATE objectives SET security_requirement = ? WHERE requirement_id = ? AND (security_requirement IS NULL OR security_requirement = '')",
+                        (sec_req_clean, req_id)
+                    )
+        conn.commit()
+        wb2.close()
+        print(f"Discussion and requirement types seeded from {XLSX_171_PATH}")
+
+    conn.close()
 
 
 FAMILY_ABBR = {
