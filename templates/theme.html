@@ -24,16 +24,19 @@
     [data-theme="light"] .add-btn { background: #2563eb !important; }
     [data-theme="light"] .add-btn:hover { background: #1d4ed8 !important; }
 
-    .theme-toggle { background: none; border: 1px solid #475569; color: #94a3b8; cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 0.375rem; font-size: 0.85rem; line-height: 1; }
-    .theme-toggle:hover { color: #e2e8f0; border-color: #64748b; }
-    [data-theme="light"] .theme-toggle { border-color: #cbd5e1; color: #64748b; }
-    [data-theme="light"] .theme-toggle:hover { color: #1e293b; border-color: #94a3b8; }
+    .theme-toggle, .font-btn { background: none; border: 1px solid #475569; color: #94a3b8; cursor: pointer; padding: 0.35rem 0.5rem; border-radius: 0.375rem; font-size: 0.85rem; line-height: 1; }
+    .theme-toggle:hover, .font-btn:hover { color: #e2e8f0; border-color: #64748b; }
+    [data-theme="light"] .theme-toggle, [data-theme="light"] .font-btn { border-color: #cbd5e1; color: #64748b; }
+    [data-theme="light"] .theme-toggle:hover, [data-theme="light"] .font-btn:hover { color: #1e293b; border-color: #94a3b8; }
+    .font-controls { display: inline-flex; gap: 0.2rem; }
 </style>
 <script>
 (function() {
     const saved = localStorage.getItem('cmmc-theme') || 'dark';
     document.documentElement.setAttribute('data-theme', saved);
     document.body.setAttribute('data-theme', saved);
+    const zoom = parseInt(localStorage.getItem('cmmc-zoom') || '100');
+    document.documentElement.style.fontSize = zoom + '%';
 })();
 function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
@@ -42,6 +45,12 @@ function toggleTheme() {
     document.body.setAttribute('data-theme', next);
     localStorage.setItem('cmmc-theme', next);
     document.querySelector('.theme-toggle').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+function changeFont(delta) {
+    let zoom = parseInt(localStorage.getItem('cmmc-zoom') || '100');
+    zoom = Math.max(60, Math.min(150, zoom + delta));
+    localStorage.setItem('cmmc-zoom', zoom);
+    document.documentElement.style.fontSize = zoom + '%';
 }
 document.addEventListener('DOMContentLoaded', () => {
     const theme = localStorage.getItem('cmmc-theme') || 'dark';

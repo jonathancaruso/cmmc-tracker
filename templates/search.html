@@ -34,7 +34,7 @@
 <body>
     <div class="container">
         <header>
-            <a href="/" class="back">← Back to Dashboard</a> <button class="theme-toggle" onclick="toggleTheme()" style="float:right;">☀️</button>
+            <a href="/" class="back">← Back to Dashboard</a> <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span> <button class="theme-toggle" onclick="toggleTheme()" style="float:right;">☀️</button>
             <h1>Search Objectives</h1>
         </header>
         <form class="search-box" method="GET" action="/search">
