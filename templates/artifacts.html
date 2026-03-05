@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evidence Library | CMMC Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+
+        .search-bar { margin-bottom: 1.5rem; }
+        .search-bar input { background: var(--bg-input); border: 1px solid var(--border); color: var(--text-primary); padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; width: 100%; max-width: 400px; }
+        .search-bar input:focus { border-color: var(--accent); outline: none; }
+
+        table { width: 100%; border-collapse: collapse; background: var(--bg-secondary); border-radius: 0.75rem; overflow: hidden; }
+        thead th { background: var(--bg-tertiary); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; padding: 0.75rem 1rem; text-align: left; cursor: pointer; user-select: none; white-space: nowrap; }
+        thead th:hover { color: var(--text-primary); }
+        tbody td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; vertical-align: top; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: var(--bg-hover); }
+
+        .linked-badge { display: inline-flex; align-items: center; gap: 0.2rem; background: #1e3a5f; color: var(--link); padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.6rem; font-weight: 600; white-space: nowrap; margin: 0.1rem; }
+        .linked-badge .unlink-btn { cursor: pointer; color: var(--text-dim); margin-left: 0.1rem; }
+        .linked-badge .unlink-btn:hover { color: #ef4444; }
+
+        .link-search { position: relative; display: inline-block; margin-top: 0.25rem; }
+        .link-search input { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.65rem; width: 9rem; }
+        .link-search input:focus { border-color: var(--accent); outline: none; }
+        .link-results { position: absolute; top: 100%; left: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.375rem; max-height: 180px; overflow-y: auto; z-index: 50; display: none; min-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .link-results.open { display: block; }
+        .link-results .lr-item { padding: 0.3rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+        .link-results .lr-item:hover { background: var(--bg-hover); }
+        .link-results .lr-item:last-child { border-bottom: none; }
+
+        .domain-tag { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.65rem; font-weight: 600; }
+        .stat-bar { display: flex; gap: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .stat-item { background: var(--bg-secondary); border-radius: 0.5rem; padding: 0.75rem 1.25rem; }
+        .stat-item .num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+        .stat-item .label { font-size: 0.75rem; color: var(--text-muted); }
+        .empty-msg { text-align: center; color: var(--text-dim); padding: 3rem; font-size: 0.9rem; }
+
+        .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: var(--danger-bg); color: var(--danger-text); padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; border: 1px solid #991b1b; }
+        .toast.show { opacity: 1; }
+    </style>
+{% include "theme.html" %}
+</head>
+<body>
+    <div class="container">
+        {% include 'nav.html' %}
+        <div class="topnav">
+            <div class="topnav-left">
+                <a href="/" class="back">← Dashboard</a>
+                <h1 style="font-size:1.3rem;margin:0;">Evidence Library</h1>
+            </div>
+            <div class="topnav-right">
+                {% if current_user %}
+                {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-btn" style="font-size:0.75rem;">Users</a><a href="/audit" class="nav-btn" style="font-size:0.75rem;">Audit Log</a>{% endif %}
+                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
+                <a href="/logout" class="nav-btn" style="font-size:0.75rem;">Logout</a>
+                {% endif %}
+                <div class="nav-search">
+                    <span class="icon">🔍</span>
+                    <input type="text" id="nav-si" placeholder="Search... ( / )" oninput="_debounceNav(this.value)" onfocus="if(this.value) _doNavSearch(this.value)" autocomplete="off">
+                    <div class="search-results" id="nav-sr"></div>
+                </div>
+                <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span>
+                <button class="theme-toggle nav-btn" onclick="toggleTheme()">☀️</button>
+            </div>
+        </div>
+
+        <div class="stat-bar" id="stats"></div>
+
+        <div class="search-bar">
+            <input type="text" id="filter-input" placeholder="Filter artifacts by name, objective, domain..." oninput="filterTable()">
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)">Filename</th>
+                    <th onclick="sortTable(1)">Original Name</th>
+                    <th onclick="sortTable(2)">Domain</th>
+                    <th onclick="sortTable(3)">Linked Objectives</th>
+                    <th onclick="sortTable(4)">Uploaded</th>
+                    <th onclick="sortTable(5)">Obtained Method</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="artifact-body">
+                <tr><td colspan="7" class="empty-msg">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script>
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    let allArtifacts = [];
+
+    async function loadLibrary() {
+        const res = await fetch('/api/artifacts/library');
+        allArtifacts = await res.json();
+        renderStats();
+        renderTable(allArtifacts);
+    }
+
+    function renderStats() {
+        const total = allArtifacts.length;
+        const shared = allArtifacts.filter(a => (a.linked_objectives || []).length > 1).length;
+        const objsCovered = new Set();
+        allArtifacts.forEach(a => (a.linked_objectives || []).forEach(lo => objsCovered.add(lo.id)));
+        document.getElementById('stats').innerHTML = `
+            <div class="stat-item"><div class="num">${total}</div><div class="label">Total Artifacts</div></div>
+            <div class="stat-item"><div class="num">${shared}</div><div class="label">Shared Artifacts</div></div>
+            <div class="stat-item"><div class="num">${objsCovered.size}</div><div class="label">Objectives Covered</div></div>
+        `;
+    }
+
+    function renderTable(artifacts) {
+        const body = document.getElementById('artifact-body');
+        if (!artifacts.length) {
+            body.innerHTML = '<tr><td colspan="7" class="empty-msg">No artifacts found</td></tr>';
+            return;
+        }
+        body.innerHTML = artifacts.map(a => {
+            const displayName = a.filename.split('/').pop();
+            const badges = (a.linked_objectives || []).map(lo =>
+                `<span class="linked-badge">${lo.id}<span class="unlink-btn" onclick="unlinkFromLibrary(${a.id}, '${lo.id}')" title="Unlink">✕</span></span>`
+            ).join('');
+            const domainHtml = a.domain_name
+                ? `<span class="domain-tag" style="background:${a.domain_color || '#6366f1'}22;color:${a.domain_color || '#6366f1'}">${a.domain_name}</span>`
+                : '<span style="color:var(--text-dim)">—</span>';
+            return `<tr data-search="${(displayName + ' ' + a.original_name + ' ' + (a.domain_name||'') + ' ' + (a.linked_objectives||[]).map(l=>l.id).join(' ') + ' ' + (a.obtained_method||'')).toLowerCase()}">
+                <td><a href="/uploads/${a.filename}" target="_blank" style="color:var(--link);text-decoration:none;font-weight:600;">${displayName}</a></td>
+                <td style="color:var(--text-secondary);font-size:0.75rem;">${a.original_name}</td>
+                <td>${domainHtml}</td>
+                <td>
+                    <div style="display:flex;flex-wrap:wrap;gap:0.15rem;">${badges}</div>
+                    <div class="link-search" data-artifact-id="${a.id}">
+                        <input type="text" placeholder="+ Link..." oninput="searchForLink(this, ${a.id})" onfocus="if(this.value)searchForLink(this, ${a.id})">
+                        <div class="link-results"></div>
+                    </div>
+                </td>
+                <td style="white-space:nowrap;color:var(--text-dim);font-size:0.75rem;">${a.uploaded_at || ''}</td>
+                <td style="color:var(--text-secondary);font-size:0.75rem;">${a.obtained_method || ''}</td>
+                <td><span style="cursor:pointer;color:var(--text-dim);font-size:0.8rem;" onclick="deleteFromLibrary(${a.id})" title="Delete artifact">🗑</span></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function filterTable() {
+        const q = document.getElementById('filter-input').value.toLowerCase();
+        const rows = document.querySelectorAll('#artifact-body tr[data-search]');
+        rows.forEach(r => {
+            r.style.display = r.dataset.search.includes(q) ? '' : 'none';
+        });
+    }
+
+    let _sortCol = -1, _sortAsc = true;
+    function sortTable(col) {
+        if (_sortCol === col) _sortAsc = !_sortAsc;
+        else { _sortCol = col; _sortAsc = true; }
+        const keys = ['filename', 'original_name', 'domain_name', 'linked_objectives', 'uploaded_at', 'obtained_method'];
+        allArtifacts.sort((a, b) => {
+            let va, vb;
+            if (keys[col] === 'linked_objectives') {
+                va = (a.linked_objectives || []).length;
+                vb = (b.linked_objectives || []).length;
+            } else {
+                va = (a[keys[col]] || '').toLowerCase();
+                vb = (b[keys[col]] || '').toLowerCase();
+            }
+            if (va < vb) return _sortAsc ? -1 : 1;
+            if (va > vb) return _sortAsc ? 1 : -1;
+            return 0;
+        });
+        renderTable(allArtifacts);
+    }
+
+    let _linkTimer;
+    async function searchForLink(input, artifactId) {
+        clearTimeout(_linkTimer);
+        const q = input.value.trim();
+        const resultsDiv = input.nextElementSibling;
+        if (!q) { resultsDiv.classList.remove('open'); return; }
+        _linkTimer = setTimeout(async () => {
+            const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+            const results = await res.json();
+            if (!results.length) {
+                resultsDiv.innerHTML = '<div class="lr-item" style="color:var(--text-dim)">No matches</div>';
+            } else {
+                resultsDiv.innerHTML = results.slice(0, 8).map(r =>
+                    `<div class="lr-item" onclick="doLink(${artifactId}, '${r.id}', this.closest('.link-search').querySelector('input'))">
+                        <strong style="color:var(--link)">${r.id}</strong> — ${r.family}
+                    </div>`
+                ).join('');
+            }
+            resultsDiv.classList.add('open');
+        }, 200);
+    }
+
+    async function doLink(artifactId, objectiveId, input) {
+        const res = await fetch(`/api/artifacts/${artifactId}/link`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({objective_id: objectiveId})
+        });
+        const data = await res.json();
+        if (data.error) showToast(data.error);
+        input.value = '';
+        input.nextElementSibling.classList.remove('open');
+        loadLibrary();
+    }
+
+    async function unlinkFromLibrary(artifactId, objectiveId) {
+        const res = await fetch(`/api/artifacts/${artifactId}/link/${encodeURIComponent(objectiveId)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error); return; }
+        loadLibrary();
+    }
+
+    async function deleteFromLibrary(artifactId) {
+        if (!confirm('Delete this artifact permanently?')) return;
+        await fetch(`/api/artifacts/delete/${artifactId}`, { method: 'POST' });
+        loadLibrary();
+    }
+
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.link-search')) {
+            document.querySelectorAll('.link-results').forEach(d => d.classList.remove('open'));
+        }
+    });
+
+    loadLibrary();
+    </script>
+</body>
+</html>

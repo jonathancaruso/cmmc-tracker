@@ -87,6 +87,7 @@
                            oninput="debounceSearch(this.value)" onfocus="if(this.value) doSearch(this.value)" autocomplete="off">
                     <div class="search-results" id="search-results"></div>
                 </div>
+                <a href="/artifacts" class="export-btn">📂 Evidence Library</a>
                 <a href="/poam" class="export-btn">📋 POA&M</a>
                 <button class="export-btn" onclick="hashArtifacts(this)">🔒 Hash Artifacts</button>
                 {% if current_user and current_user.role == 'admin' %}<a href="/config" class="export-btn">⚙ Config</a>{% endif %}
@@ -109,6 +110,7 @@
                     <div style="font-size:1.5rem;font-weight:700;color:var(--purple-text);">{{ totals['artifact_count'] or 0 }}</div>
                     <div style="font-size:0.75rem;color:var(--text-muted);">artifacts uploaded</div>
                     <div style="font-size:0.7rem;color:var(--text-dim);">{{ totals['objectives_with_evidence'] or 0 }} objectives covered</div>
+                    {% if shared_artifacts %}<div style="font-size:0.7rem;color:var(--link);">{{ shared_artifacts }} shared across objectives</div>{% endif %}
                 </div>
                 <div style="flex:1">
                     {% set pct = ((totals['captured'] or 0) / totals['total'] * 100) | round(1) if totals['total'] > 0 else 0 %}

@@ -76,6 +76,19 @@
         .upload-btn { display: inline-flex; align-items: center; gap: 0.3rem; background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-muted); padding: 0.25rem 0.6rem; border-radius: 0.375rem; font-size: 0.75rem; cursor: pointer; }
         .upload-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 
+        .linked-badge { display: inline-flex; align-items: center; gap: 0.2rem; background: #1e3a5f; color: var(--link); padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.6rem; font-weight: 600; white-space: nowrap; }
+        .linked-badge .unlink-btn { cursor: pointer; color: var(--text-dim); margin-left: 0.1rem; }
+        .linked-badge .unlink-btn:hover { color: #ef4444; }
+        .link-search { position: relative; display: inline-block; }
+        .link-search input { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.2rem 0.4rem; border-radius: 0.25rem; font-size: 0.65rem; width: 9rem; }
+        .link-search input:focus { border-color: {{ color }}; outline: none; }
+        .link-results { position: absolute; top: 100%; left: 0; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.375rem; max-height: 180px; overflow-y: auto; z-index: 50; display: none; min-width: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .link-results.open { display: block; }
+        .link-results .lr-item { padding: 0.3rem 0.5rem; cursor: pointer; font-size: 0.7rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
+        .link-results .lr-item:hover { background: var(--bg-hover); }
+        .link-results .lr-item:last-child { border-bottom: none; }
+        .is-linked-tag { background: var(--purple-bg); color: #c084fc; font-size: 0.6rem; padding: 0.1rem 0.35rem; border-radius: 0.2rem; font-weight: 600; }
+
         .example-artifacts { margin-top: 0.4rem; padding: 0.5rem 0.6rem; background: var(--bg-deep); border: 1px solid #1e3a5f; border-radius: 0.375rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
         .example-artifacts summary { color: var(--link); cursor: pointer; font-size: 0.7rem; font-weight: 600; }
         .example-artifacts summary:hover { color: var(--link-hover); }
@@ -109,6 +122,7 @@
             </div>
             <div class="topnav-right">
                 {% if current_user %}
+                <a href="/artifacts" class="nav-btn" style="font-size:0.75rem;">Evidence Library</a>
                 {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-btn" style="font-size:0.75rem;">Users</a><a href="/audit" class="nav-btn" style="font-size:0.75rem;">Audit Log</a>{% endif %}
                 <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
                 <a href="/logout" class="nav-btn" style="font-size:0.75rem;">Logout</a>
@@ -344,17 +358,32 @@
             if (a.file_size) meta.push(formatSize(a.file_size));
             if (a.uploaded_at) meta.push('uploaded ' + a.uploaded_at);
             if (a.file_created) meta.push('created ' + a.file_created);
+            const isLinked = a.is_linked;
+            const linkedBadges = (a.linked_objectives || [])
+                .filter(lo => lo.id !== objId)
+                .map(lo => `<span class="linked-badge">${lo.id}<span class="unlink-btn" onclick="unlinkArtifact(${a.id}, '${lo.id}', '${objId}')" title="Unlink from ${lo.id}">✕</span></span>`)
+                .join('');
             return `
             <span class="artifact-item" style="flex-direction:column;align-items:flex-start;padding:0.35rem 0.5rem;">
-                <span style="display:flex;align-items:center;gap:0.3rem;">
+                <span style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;">
                     ${isImage(a.original_name) ? `<img src="/uploads/${a.filename}" class="preview">` : ''}
-
+                    ${isLinked ? '<span class="is-linked-tag">LINKED</span>' : ''}
                     <a href="/uploads/${a.filename}" target="_blank" style="font-weight:600;">${displayName}</a>
                     <select class="domain-select" style="font-size:0.65rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:0.25rem;color:var(--text-primary);padding:0.1rem 0.2rem;" onchange="updateArtifactDomain(${a.id}, this.value, '${objId}')">
                         <option value="">No tag</option>
                         ${domainCache.map(d => `<option value="${d.id}" ${a.domain_id == d.id ? 'selected' : ''}>${d.name}</option>`).join('')}
                     </select>
-                    <span class="delete-artifact" onclick="deleteArtifact(${a.id}, '${objId}')" title="Delete">✕</span>
+                    ${isLinked
+                        ? `<span class="delete-artifact" onclick="unlinkArtifact(${a.id}, '${objId}', '${objId}')" title="Unlink from this objective">✕</span>`
+                        : `<span class="delete-artifact" onclick="deleteArtifact(${a.id}, '${objId}')" title="Delete">✕</span>`
+                    }
+                </span>
+                <span style="display:flex;gap:0.3rem;align-items:center;flex-wrap:wrap;margin-top:0.15rem;">
+                    ${linkedBadges}
+                    <span class="link-search" data-artifact-id="${a.id}" data-obj-id="${objId}">
+                        <input type="text" placeholder="+ Link objective..." oninput="searchObjectivesForLink(this, ${a.id}, '${objId}')" onfocus="if(this.value)searchObjectivesForLink(this, ${a.id}, '${objId}')">
+                        <div class="link-results"></div>
+                    </span>
                 </span>
                 <span style="color:var(--text-dim);font-size:0.65rem;">
                     ${a.original_name !== displayName ? `orig: ${a.original_name} · ` : ''}${meta.join(' · ')}
@@ -507,6 +536,55 @@
         });
         loadAssignments(objId);
     }
+
+    let _linkTimer;
+    async function searchObjectivesForLink(input, artifactId, currentObjId) {
+        clearTimeout(_linkTimer);
+        const q = input.value.trim();
+        const resultsDiv = input.nextElementSibling;
+        if (!q) { resultsDiv.classList.remove('open'); return; }
+        _linkTimer = setTimeout(async () => {
+            const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+            const results = await res.json();
+            if (!results.length) {
+                resultsDiv.innerHTML = '<div class="lr-item" style="color:var(--text-dim)">No matches</div>';
+            } else {
+                resultsDiv.innerHTML = results.slice(0, 8).map(r =>
+                    `<div class="lr-item" onclick="doLinkArtifact(${artifactId}, '${r.id}', '${currentObjId}', this.closest('.link-search').querySelector('input'))">
+                        <strong style="color:var(--link)">${r.id}</strong> — ${r.family}
+                    </div>`
+                ).join('');
+            }
+            resultsDiv.classList.add('open');
+        }, 200);
+    }
+
+    async function doLinkArtifact(artifactId, objectiveId, currentObjId, input) {
+        const res = await fetch(`/api/artifacts/${artifactId}/link`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({objective_id: objectiveId})
+        });
+        const data = await res.json();
+        if (data.error) { showToast(data.error); }
+        input.value = '';
+        input.nextElementSibling.classList.remove('open');
+        loadArtifacts(currentObjId);
+    }
+
+    async function unlinkArtifact(artifactId, objectiveId, currentObjId) {
+        const res = await fetch(`/api/artifacts/${artifactId}/link/${encodeURIComponent(objectiveId)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.error) { showToast(data.error); return; }
+        loadArtifacts(currentObjId);
+    }
+
+    // Close link search dropdowns on outside click
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.link-search')) {
+            document.querySelectorAll('.link-results').forEach(d => d.classList.remove('open'));
+        }
+    });
 
     // Auto-open and scroll to requirement from search
     (function() {

@@ -128,6 +128,15 @@ def init_db():
             timestamp TEXT NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS artifact_objectives (
+            artifact_id INTEGER NOT NULL,
+            objective_id TEXT NOT NULL,
+            PRIMARY KEY (artifact_id, objective_id),
+            FOREIGN KEY (artifact_id) REFERENCES artifacts(id),
+            FOREIGN KEY (objective_id) REFERENCES objectives(id)
+        )
+    """)
     conn.commit()
 
     # Migrate existing DBs: add columns if they don't exist
@@ -188,6 +197,17 @@ def init_db():
             pass
 
     # No default domains — user adds their AD domains via config page
+
+    # Migrate: populate artifact_objectives junction table from artifacts.objective_id
+    try:
+        existing = conn.execute("SELECT COUNT(*) FROM artifact_objectives").fetchone()[0]
+        if existing == 0:
+            conn.execute("""
+                INSERT OR IGNORE INTO artifact_objectives (artifact_id, objective_id)
+                SELECT id, objective_id FROM artifacts WHERE objective_id IS NOT NULL
+            """)
+    except Exception:
+        pass
 
     conn.commit()
 
@@ -460,11 +480,19 @@ def dashboard():
         LEFT JOIN artifacts a ON d.id = a.domain_id
         GROUP BY d.id ORDER BY d.name
     """).fetchall()
+    # Count shared artifacts (linked to more than one objective)
+    shared_artifacts = conn.execute("""
+        SELECT COUNT(*) FROM (
+            SELECT artifact_id FROM artifact_objectives
+            GROUP BY artifact_id HAVING COUNT(*) > 1
+        )
+    """).fetchone()[0]
     conn.close()
     return render_template("dashboard.html",
                            families=families, totals=totals,
                            abbr=FAMILY_ABBR, colors=FAMILY_COLORS,
-                           domain_coverage=domain_coverage)
+                           domain_coverage=domain_coverage,
+                           shared_artifacts=shared_artifacts)
 
 
 @app.route("/family/<path:family_name>")
@@ -1043,13 +1071,26 @@ def bulk_assign():
 def list_artifacts(objective_id):
     conn = get_db()
     rows = conn.execute("""
-        SELECT a.*, d.name as domain_name, d.color as domain_color
-        FROM artifacts a
+        SELECT a.*, d.name as domain_name, d.color as domain_color,
+               CASE WHEN a.objective_id != ? THEN 1 ELSE 0 END as is_linked
+        FROM artifact_objectives ao
+        JOIN artifacts a ON ao.artifact_id = a.id
         LEFT JOIN domains d ON a.domain_id = d.id
-        WHERE a.objective_id = ? ORDER BY a.uploaded_at DESC
-    """, (objective_id,)).fetchall()
+        WHERE ao.objective_id = ? ORDER BY a.uploaded_at DESC
+    """, (objective_id, objective_id)).fetchall()
+    # For each artifact, get all linked objectives
+    result = []
+    for r in rows:
+        d = dict(r)
+        linked = conn.execute("""
+            SELECT ao.objective_id, o.family FROM artifact_objectives ao
+            JOIN objectives o ON ao.objective_id = o.id
+            WHERE ao.artifact_id = ?
+        """, (r['id'],)).fetchall()
+        d['linked_objectives'] = [{'id': l['objective_id'], 'family': l['family']} for l in linked]
+        result.append(d)
     conn.close()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(result)
 
 
 def _extract_file_created(filepath, ext):
@@ -1183,11 +1224,15 @@ def upload_artifact():
     # Extract creation date from file metadata
     file_created = _extract_file_created(filepath, ext)
 
-    conn.execute("""
+    now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cursor = conn.execute("""
         INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at, domain_id, file_created)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (objective_id, f"{safe_id}/{filename}", file.filename, file_size,
-          file.content_type, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), domain_id, file_created))
+          file.content_type, now_ts, domain_id, file_created))
+    # Also insert into junction table
+    conn.execute("INSERT OR IGNORE INTO artifact_objectives (artifact_id, objective_id) VALUES (?, ?)",
+                  (cursor.lastrowid, objective_id))
     log_audit('uploaded', 'artifact', objective_id, f"Uploaded {filename}", conn=conn)
     conn.commit()
     conn.close()
@@ -1208,6 +1253,7 @@ def delete_artifact(artifact_id):
     if os.path.exists(filepath):
         os.remove(filepath)
 
+    conn.execute("DELETE FROM artifact_objectives WHERE artifact_id = ?", (artifact_id,))
     conn.execute("DELETE FROM artifacts WHERE id = ?", (artifact_id,))
     log_audit('deleted', 'artifact', artifact_id,
               f"Deleted {row['original_name']} from {row['objective_id']}", conn=conn)
@@ -1271,6 +1317,81 @@ def update_artifact_obtained(artifact_id):
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+@app.route("/api/artifacts/<int:artifact_id>/link", methods=["POST"])
+def link_artifact(artifact_id):
+    data = request.json
+    objective_id = data.get("objective_id", "").strip()
+    if not objective_id:
+        return jsonify({"error": "Missing objective_id"}), 400
+    conn = get_db()
+    # Verify artifact and objective exist
+    artifact = conn.execute("SELECT id FROM artifacts WHERE id = ?", (artifact_id,)).fetchone()
+    if not artifact:
+        conn.close()
+        return jsonify({"error": "Artifact not found"}), 404
+    objective = conn.execute("SELECT id FROM objectives WHERE id = ?", (objective_id,)).fetchone()
+    if not objective:
+        conn.close()
+        return jsonify({"error": "Objective not found"}), 404
+    try:
+        conn.execute("INSERT INTO artifact_objectives (artifact_id, objective_id) VALUES (?, ?)",
+                      (artifact_id, objective_id))
+        log_audit('linked', 'artifact', artifact_id,
+                  f"Linked artifact #{artifact_id} to {objective_id}", conn=conn)
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "Already linked"}), 409
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/artifacts/<int:artifact_id>/link/<path:objective_id>", methods=["DELETE"])
+def unlink_artifact(artifact_id, objective_id):
+    conn = get_db()
+    # Don't allow unlinking the original/primary objective if it's the last link
+    count = conn.execute("SELECT COUNT(*) FROM artifact_objectives WHERE artifact_id = ?",
+                          (artifact_id,)).fetchone()[0]
+    if count <= 1:
+        conn.close()
+        return jsonify({"error": "Cannot unlink the last objective. Delete the artifact instead."}), 400
+    conn.execute("DELETE FROM artifact_objectives WHERE artifact_id = ? AND objective_id = ?",
+                  (artifact_id, objective_id))
+    log_audit('unlinked', 'artifact', artifact_id,
+              f"Unlinked artifact #{artifact_id} from {objective_id}", conn=conn)
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/artifacts/library")
+def artifacts_library_api():
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT a.*, d.name as domain_name, d.color as domain_color
+        FROM artifacts a
+        LEFT JOIN domains d ON a.domain_id = d.id
+        ORDER BY a.uploaded_at DESC
+    """).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        linked = conn.execute("""
+            SELECT ao.objective_id, o.family FROM artifact_objectives ao
+            JOIN objectives o ON ao.objective_id = o.id
+            WHERE ao.artifact_id = ?
+        """, (r['id'],)).fetchall()
+        d['linked_objectives'] = [{'id': l['objective_id'], 'family': l['family']} for l in linked]
+        result.append(d)
+    conn.close()
+    return jsonify(result)
+
+
+@app.route("/artifacts")
+def artifacts_library_page():
+    return render_template("artifacts.html")
 
 
 @app.route("/uploads/<path:filename>")

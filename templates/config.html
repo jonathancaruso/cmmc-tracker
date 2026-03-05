@@ -53,6 +53,7 @@
             </div>
             <div class="topnav-right">
                 {% if current_user %}
+                <a href="/artifacts" class="nav-btn" style="font-size:0.75rem;">Evidence Library</a>
                 {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-btn" style="font-size:0.75rem;">Users</a><a href="/audit" class="nav-btn" style="font-size:0.75rem;">Audit Log</a>{% endif %}
                 <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
                 <a href="/logout" class="nav-btn" style="font-size:0.75rem;">Logout</a>
