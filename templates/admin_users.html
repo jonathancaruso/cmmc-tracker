@@ -119,6 +119,7 @@
                         <td><span class="date-text">{{ u['created_at'] }}</span></td>
                         <td>
                             <div class="actions">
+                                <button class="action-btn" onclick="editUser({{ u['id'] }}, '{{ u['first_name'] }}', '{{ u['last_name'] }}', '{{ u['role'] }}')">Edit</button>
                                 <button class="action-btn" onclick="resetPassword({{ u['id'] }}, '{{ u['username'] }}')">Reset Password</button>
                                 <button class="action-btn danger" onclick="deleteUser({{ u['id'] }}, '{{ u['username'] }}')">Delete</button>
                             </div>
@@ -161,6 +162,30 @@
             location.reload();
         } else {
             showToast(result.error || 'Failed to create user', 'error');
+        }
+    }
+
+    async function editUser(id, firstName, lastName, role) {
+        const newFirst = prompt('First name:', firstName);
+        if (newFirst === null) return;
+        const newLast = prompt('Last name:', lastName);
+        if (newLast === null) return;
+        const newRole = prompt('Role (admin or user):', role);
+        if (newRole === null) return;
+        if (newRole !== 'admin' && newRole !== 'user') {
+            showToast('Role must be "admin" or "user"', 'error');
+            return;
+        }
+        const res = await fetch(`/api/admin/users/${id}`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ first_name: newFirst.trim(), last_name: newLast.trim(), role: newRole })
+        });
+        const result = await res.json();
+        if (result.ok) {
+            location.reload();
+        } else {
+            showToast(result.error || 'Failed to update user', 'error');
         }
     }
 

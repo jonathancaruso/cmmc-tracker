@@ -1582,6 +1582,48 @@ def admin_create_user():
     return jsonify({"ok": True})
 
 
+@app.route("/api/admin/users/<int:user_id>", methods=["PATCH"])
+@admin_required
+def admin_edit_user(user_id):
+    data = request.json
+    first_name = data.get("first_name", "").strip()
+    last_name = data.get("last_name", "").strip()
+    role = data.get("role", "").strip()
+    if not first_name or not last_name:
+        return jsonify({"error": "First and last name are required"}), 400
+    if role not in ('admin', 'user'):
+        return jsonify({"error": "Invalid role"}), 400
+    conn = get_db()
+    old_user = conn.execute("SELECT username, first_name, last_name, role FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not old_user:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    # Prevent removing own admin role
+    if user_id == session.get('user_id') and role != 'admin':
+        conn.close()
+        return jsonify({"error": "Cannot remove your own admin role"}), 400
+    old_display = f"{old_user['first_name']} {old_user['last_name']}"
+    new_display = f"{first_name} {last_name}"
+    conn.execute("UPDATE users SET first_name = ?, last_name = ?, role = ? WHERE id = ?",
+                 (first_name, last_name, role, user_id))
+    # Update team member name if it matches
+    if old_display != new_display:
+        conn.execute("UPDATE team_members SET name = ? WHERE name = ?", (new_display, old_display))
+    if old_user['role'] != role:
+        conn.execute("UPDATE team_members SET role = ? WHERE name = ?", (role, new_display))
+    conn.commit()
+    # Audit
+    changes = []
+    if old_user['first_name'] != first_name or old_user['last_name'] != last_name:
+        changes.append(f"Name: {old_display} -> {new_display}")
+    if old_user['role'] != role:
+        changes.append(f"Role: {old_user['role']} -> {role}")
+    if changes:
+        audit_log(conn, 'edit_user', 'user', str(user_id), '; '.join(changes))
+    conn.close()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
 @admin_required
 def admin_delete_user(user_id):
