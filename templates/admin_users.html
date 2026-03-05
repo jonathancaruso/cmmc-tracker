@@ -52,7 +52,7 @@
             </div>
             <div class="topnav-right">
                 {% if current_user %}
-                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.username }}</span>
+                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
                 <a href="/logout" class="nav-btn" style="font-size:0.75rem;">Logout</a>
                 {% endif %}
                 <div class="nav-search">
@@ -68,6 +68,14 @@
         <div class="section">
             <h2>Create User</h2>
             <form class="add-form" onsubmit="createUser(event)">
+                <div class="field">
+                    <label>First Name</label>
+                    <input type="text" name="first_name" required>
+                </div>
+                <div class="field">
+                    <label>Last Name</label>
+                    <input type="text" name="last_name" required>
+                </div>
                 <div class="field">
                     <label>Username</label>
                     <input type="text" name="username" required>
@@ -93,6 +101,7 @@
             <table>
                 <thead>
                     <tr>
+                        <th>Name</th>
                         <th>Username</th>
                         <th>Role</th>
                         <th>Created</th>
@@ -102,7 +111,8 @@
                 <tbody>
                     {% for u in users %}
                     <tr id="user-{{ u['id'] }}">
-                        <td style="font-weight:600;">{{ u['username'] }}</td>
+                        <td style="font-weight:600;">{{ u['first_name'] }} {{ u['last_name'] }}</td>
+                        <td>{{ u['username'] }}</td>
                         <td><span class="role-tag role-{{ u['role'] }}">{{ u['role'] }}</span></td>
                         <td><span class="date-text">{{ u['created_at'] }}</span></td>
                         <td>
@@ -132,6 +142,8 @@
         e.preventDefault();
         const form = e.target;
         const data = {
+            first_name: form.first_name.value.trim(),
+            last_name: form.last_name.value.trim(),
             username: form.username.value.trim(),
             password: form.password.value,
             role: form.role.value

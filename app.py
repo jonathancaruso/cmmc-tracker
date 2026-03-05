@@ -98,6 +98,8 @@ def init_db():
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'user',
+            first_name TEXT DEFAULT '',
+            last_name TEXT DEFAULT '',
             created_at TEXT NOT NULL
         )
     """)
@@ -153,6 +155,16 @@ def init_db():
             conn.execute("ALTER TABLE artifacts ADD COLUMN file_created TEXT")
         except Exception:
             pass
+
+    # Migrate: add first_name, last_name to users
+    for col in ["first_name", "last_name"]:
+        try:
+            conn.execute(f"SELECT {col} FROM users LIMIT 1")
+        except Exception:
+            try:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT ''")
+            except Exception:
+                pass
 
     # Migrate: add obtained_method to artifacts
     try:
@@ -354,7 +366,7 @@ def check_auth():
 def inject_user():
     if 'user_id' in session:
         conn = get_db()
-        user = conn.execute("SELECT id, username, role FROM users WHERE id = ?",
+        user = conn.execute("SELECT id, username, role, first_name, last_name FROM users WHERE id = ?",
                             (session['user_id'],)).fetchone()
         conn.close()
         if user:
@@ -1255,25 +1267,30 @@ def setup():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
+        first_name = request.form.get("first_name", "").strip()
+        last_name = request.form.get("last_name", "").strip()
         confirm = request.form.get("confirm_password", "")
         errors = []
         if not username:
             errors.append("Username is required")
+        if not first_name or not last_name:
+            errors.append("First and last name are required")
         if password != confirm:
             errors.append("Passwords do not match")
         errors.extend(validate_password(password))
         if errors:
-            return render_template("setup.html", errors=errors, username=username)
+            return render_template("setup.html", errors=errors, username=username, first_name=first_name, last_name=last_name)
         conn = get_db()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        display_name = f"{first_name} {last_name}"
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
-            (username, generate_password_hash(password), 'admin', now)
+            "INSERT INTO users (username, password_hash, role, first_name, last_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password), 'admin', first_name, last_name, now)
         )
         # Auto-create team member for assignment dropdown
         conn.execute(
             "INSERT INTO team_members (name, role, email, created_at) VALUES (?, ?, ?, ?)",
-            (username, 'admin', '', now)
+            (display_name, 'admin', '', now)
         )
         conn.commit()
         conn.close()
@@ -1308,7 +1325,7 @@ def logout():
 @admin_required
 def admin_users():
     conn = get_db()
-    users = conn.execute("SELECT id, username, role, created_at FROM users ORDER BY created_at").fetchall()
+    users = conn.execute("SELECT id, username, role, first_name, last_name, created_at FROM users ORDER BY created_at").fetchall()
     conn.close()
     return render_template("admin_users.html", users=users)
 
@@ -1320,24 +1337,29 @@ def admin_create_user():
     username = data.get("username", "").strip()
     password = data.get("password", "")
     role = data.get("role", "user")
+    first_name = data.get("first_name", "").strip()
+    last_name = data.get("last_name", "").strip()
     if role not in ('admin', 'user'):
         return jsonify({"error": "Invalid role"}), 400
     if not username:
         return jsonify({"error": "Username is required"}), 400
+    if not first_name or not last_name:
+        return jsonify({"error": "First and last name are required"}), 400
     errors = validate_password(password)
     if errors:
         return jsonify({"error": "; ".join(errors)}), 400
     conn = get_db()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    display_name = f"{first_name} {last_name}"
     try:
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) VALUES (?, ?, ?, ?)",
-            (username, generate_password_hash(password), role, now)
+            "INSERT INTO users (username, password_hash, role, first_name, last_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password), role, first_name, last_name, now)
         )
         # Auto-create team member for assignment dropdown
         conn.execute(
             "INSERT INTO team_members (name, role, email, created_at) VALUES (?, ?, ?, ?)",
-            (username, role, '', now)
+            (display_name, role, '', now)
         )
         conn.commit()
     except sqlite3.IntegrityError:

@@ -93,7 +93,7 @@
                 <a href="/api/export" class="export-btn">⬇ Export CSV</a>
                 {% if current_user %}
                 {% if current_user.role == 'admin' %}<a href="/admin/users" class="export-btn">Users</a>{% endif %}
-                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.username }}</span>
+                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
                 <a href="/logout" class="export-btn">Logout</a>
                 {% endif %}
                 <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span>
