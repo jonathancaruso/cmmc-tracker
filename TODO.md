@@ -17,16 +17,28 @@
 - [x] Search — global search by objective ID, text, or family
 - [x] Due dates on assignments — date picker UI, highlight overdue in red
 - [x] Status workflow — Not Started → In Progress → Evidence Collected → Reviewed → Complete
-
-## In Progress
-
-## Backlog (Priority Order)
 - [x] Artifact count on dashboard cards (evidence attached vs total objectives)
 - [x] POA&M generator — auto-generate Plan of Action & Milestones for incomplete objectives
-- [ ] Evidence mapping — link one artifact to multiple objectives
+- [x] Evidence mapping — link one artifact to multiple objectives
+- [x] Domain/asset tagging for artifacts
+- [x] Auto-rename artifacts (AC-3.01.01.a-Domain.pdf)
+- [x] File metadata extraction (creation date from EXIF, PDF, docx, xlsx)
+- [x] "How was this obtained?" per artifact
+- [x] User auth with first-run setup flow
+- [x] Role-based access (admin/user)
+- [x] Audit trail — logs all user actions
+- [x] Dark/light mode toggle
+- [x] Font size controls
+- [x] Security audit — CSRF, XSS, rate limiting, secure headers, file upload hardening
+- [x] Print/PDF assessment report
+- [x] Landing page
+
+## Backlog (Priority Order)
 - [ ] Comments/activity log per objective
-- [ ] Print/PDF assessment report
 - [ ] Dashboard charts (bar/pie for visual progress)
 - [ ] SSP mapping — link requirements to System Security Plan sections
 - [ ] Import/export full state as zip backup
 - [ ] Email notifications for overdue assignments
+- [ ] Multi-tenant support (multiple organizations)
+- [ ] API documentation (OpenAPI/Swagger)
+- [ ] Docker Compose production config (nginx, SSL)
