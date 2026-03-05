@@ -113,14 +113,39 @@
                 <tbody>
                     {% for u in users %}
                     <tr id="user-{{ u['id'] }}">
-                        <td style="font-weight:600;">{{ u['first_name'] }} {{ u['last_name'] }}</td>
+                        <td>
+                            <span class="view-mode-{{ u['id'] }}" style="font-weight:600;">{{ u['first_name'] }} {{ u['last_name'] }}</span>
+                            <span class="edit-mode-{{ u['id'] }}" style="display:none;">
+                                <input type="text" id="edit-fn-{{ u['id'] }}" value="{{ u['first_name'] }}" placeholder="First" style="width:5rem;padding:0.2rem 0.4rem;font-size:0.8rem;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-primary);border-radius:0.25rem;">
+                                <input type="text" id="edit-ln-{{ u['id'] }}" value="{{ u['last_name'] }}" placeholder="Last" style="width:5rem;padding:0.2rem 0.4rem;font-size:0.8rem;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-primary);border-radius:0.25rem;">
+                            </span>
+                        </td>
                         <td>{{ u['username'] }}</td>
-                        <td><span class="role-tag role-{{ u['role'] }}">{{ u['role'] }}</span></td>
+                        <td>
+                            <span class="view-mode-{{ u['id'] }}"><span class="role-tag role-{{ u['role'] }}">{{ u['role'] }}</span></span>
+                            <span class="edit-mode-{{ u['id'] }}" style="display:none;">
+                                <select id="edit-role-{{ u['id'] }}" style="padding:0.2rem 0.4rem;font-size:0.8rem;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-primary);border-radius:0.25rem;">
+                                    <option value="user" {{ 'selected' if u['role'] == 'user' }}>user</option>
+                                    <option value="admin" {{ 'selected' if u['role'] == 'admin' }}>admin</option>
+                                </select>
+                            </span>
+                        </td>
                         <td><span class="date-text">{{ u['created_at'] }}</span></td>
                         <td>
                             <div class="actions">
-                                <button class="action-btn" onclick="editUser({{ u['id'] }}, '{{ u['first_name'] }}', '{{ u['last_name'] }}', '{{ u['role'] }}')">Edit</button>
-                                <button class="action-btn" onclick="resetPassword({{ u['id'] }}, '{{ u['username'] }}')">Reset Password</button>
+                                <span class="view-mode-{{ u['id'] }}">
+                                    <button class="action-btn" onclick="startEdit({{ u['id'] }})">Edit</button>
+                                    <button class="action-btn" onclick="startResetPw({{ u['id'] }})">Reset Password</button>
+                                </span>
+                                <span class="edit-mode-{{ u['id'] }}" style="display:none;">
+                                    <button class="action-btn" style="background:var(--success-bg);color:var(--success-text);border-color:var(--success-bg);" onclick="saveEdit({{ u['id'] }})">Save</button>
+                                    <button class="action-btn" onclick="cancelEdit({{ u['id'] }}, '{{ u['first_name'] }}', '{{ u['last_name'] }}', '{{ u['role'] }}')">Cancel</button>
+                                </span>
+                                <span class="pw-mode-{{ u['id'] }}" style="display:none;">
+                                    <input type="password" id="edit-pw-{{ u['id'] }}" placeholder="New password (16+ chars)" style="width:12rem;padding:0.2rem 0.4rem;font-size:0.8rem;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-primary);border-radius:0.25rem;">
+                                    <button class="action-btn" style="background:var(--success-bg);color:var(--success-text);border-color:var(--success-bg);" onclick="savePassword({{ u['id'] }})">Save</button>
+                                    <button class="action-btn" onclick="cancelPw({{ u['id'] }})">Cancel</button>
+                                </span>
                                 <button class="action-btn danger" onclick="deleteUser({{ u['id'] }}, '{{ u['username'] }}')">Delete</button>
                             </div>
                         </td>
@@ -165,28 +190,51 @@
         }
     }
 
-    async function editUser(id, firstName, lastName, role) {
-        const newFirst = prompt('First name:', firstName);
-        if (newFirst === null) return;
-        const newLast = prompt('Last name:', lastName);
-        if (newLast === null) return;
-        const newRole = prompt('Role (admin or user):', role);
-        if (newRole === null) return;
-        if (newRole !== 'admin' && newRole !== 'user') {
-            showToast('Role must be "admin" or "user"', 'error');
-            return;
-        }
+    function startEdit(id) {
+        document.querySelectorAll(`.view-mode-${id}`).forEach(el => el.style.display = 'none');
+        document.querySelectorAll(`.edit-mode-${id}`).forEach(el => el.style.display = 'inline');
+    }
+    function cancelEdit(id, fn, ln, role) {
+        document.getElementById(`edit-fn-${id}`).value = fn;
+        document.getElementById(`edit-ln-${id}`).value = ln;
+        document.getElementById(`edit-role-${id}`).value = role;
+        document.querySelectorAll(`.view-mode-${id}`).forEach(el => el.style.display = 'inline');
+        document.querySelectorAll(`.edit-mode-${id}`).forEach(el => el.style.display = 'none');
+    }
+    async function saveEdit(id) {
+        const fn = document.getElementById(`edit-fn-${id}`).value.trim();
+        const ln = document.getElementById(`edit-ln-${id}`).value.trim();
+        const role = document.getElementById(`edit-role-${id}`).value;
+        if (!fn || !ln) { showToast('First and last name required', 'error'); return; }
         const res = await fetch(`/api/admin/users/${id}`, {
             method: 'PATCH',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ first_name: newFirst.trim(), last_name: newLast.trim(), role: newRole })
+            body: JSON.stringify({ first_name: fn, last_name: ln, role: role })
         });
         const result = await res.json();
-        if (result.ok) {
-            location.reload();
-        } else {
-            showToast(result.error || 'Failed to update user', 'error');
-        }
+        if (result.ok) { location.reload(); }
+        else { showToast(result.error || 'Failed to update', 'error'); }
+    }
+    function startResetPw(id) {
+        document.querySelectorAll(`.view-mode-${id}`).forEach(el => el.style.display = 'none');
+        document.querySelectorAll(`.pw-mode-${id}`).forEach(el => el.style.display = 'inline');
+    }
+    function cancelPw(id) {
+        document.getElementById(`edit-pw-${id}`).value = '';
+        document.querySelectorAll(`.view-mode-${id}`).forEach(el => el.style.display = 'inline');
+        document.querySelectorAll(`.pw-mode-${id}`).forEach(el => el.style.display = 'none');
+    }
+    async function savePassword(id) {
+        const pw = document.getElementById(`edit-pw-${id}`).value;
+        if (!pw) { showToast('Enter a password', 'error'); return; }
+        const res = await fetch(`/api/admin/users/${id}/reset`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ password: pw })
+        });
+        const result = await res.json();
+        if (result.ok) { showToast('Password reset', 'success'); cancelPw(id); }
+        else { showToast(result.error || 'Failed', 'error'); }
     }
 
     async function deleteUser(id, name) {
@@ -200,21 +248,6 @@
         }
     }
 
-    async function resetPassword(id, name) {
-        const pw = prompt(`Enter new password for "${name}":\n(Min 16 chars, uppercase, lowercase, number, special char)`);
-        if (!pw) return;
-        const res = await fetch(`/api/admin/users/${id}/reset`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ password: pw })
-        });
-        const result = await res.json();
-        if (result.ok) {
-            showToast('Password reset successfully', 'success');
-        } else {
-            showToast(result.error || 'Failed to reset password', 'error');
-        }
-    }
     </script>
 </body>
 </html>
