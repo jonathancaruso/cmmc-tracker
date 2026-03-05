@@ -119,12 +119,7 @@ def init_db():
         except Exception:
             pass
 
-    # Seed default domains if table is empty
-    domain_count = conn.execute("SELECT COUNT(*) FROM domains").fetchone()[0]
-    if domain_count == 0:
-        for dname, dcolor in [("IT", "#3b82f6"), ("Security", "#ef4444"), ("Management", "#f59e0b"),
-                               ("HR", "#8b5cf6"), ("Facilities", "#10b981"), ("Legal", "#6366f1")]:
-            conn.execute("INSERT OR IGNORE INTO domains (name, color) VALUES (?, ?)", (dname, dcolor))
+    # No default domains — user adds their AD domains via config page
 
     conn.commit()
 
