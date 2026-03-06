@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CMMC Artifact Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
@@ -143,6 +144,21 @@
             {% endif %}
         </div>
 
+        <div class="chart-row" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:2rem;">
+            <div style="background:var(--bg-secondary);border-radius:0.75rem;padding:1.25rem;text-align:center;">
+                <h3 style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;">Overall Completion</h3>
+                <canvas id="progressPie" style="max-height:200px;"></canvas>
+            </div>
+            <div style="background:var(--bg-secondary);border-radius:0.75rem;padding:1.25rem;text-align:center;">
+                <h3 style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;">Completion by Family</h3>
+                <canvas id="familyBar" style="max-height:200px;"></canvas>
+            </div>
+            <div style="background:var(--bg-secondary);border-radius:0.75rem;padding:1.25rem;text-align:center;">
+                <h3 style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;">Status Breakdown</h3>
+                <canvas id="statusDonut" style="max-height:200px;"></canvas>
+            </div>
+        </div>
+
         <div class="filter-bar">
             <button class="filter-btn active" onclick="filterFamilies('all', this)">All ({{ families|length }})</button>
             <button class="filter-btn" onclick="filterFamilies('incomplete', this)">Incomplete</button>
@@ -243,6 +259,68 @@
         btn.disabled = false;
         btn.textContent = '🔒 Hash Artifacts';
     }
+    </script>
+
+    <script>
+    (function() {
+        const textColor = getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#888';
+        Chart.defaults.color = textColor;
+
+        // Progress pie chart
+        {% set not_started_count = totals['total'] - (totals['captured'] or 0) - (totals['in_progress'] or 0) - (totals['evidence_collected'] or 0) - (totals['reviewed'] or 0) %}
+        new Chart(document.getElementById('progressPie'), {
+            type: 'pie',
+            data: {
+                labels: ['Complete', 'In Progress', 'Not Started'],
+                datasets: [{
+                    data: [{{ totals['captured'] or 0 }}, {{ (totals['in_progress'] or 0) + (totals['evidence_collected'] or 0) + (totals['reviewed'] or 0) }}, {{ not_started_count }}],
+                    backgroundColor: ['#10b981', '#f59e0b', '#6b7280']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8, font: { size: 11 } } } }
+            }
+        });
+
+        // Family bar chart
+        new Chart(document.getElementById('familyBar'), {
+            type: 'bar',
+            data: {
+                labels: [{% for f in families %}'{{ abbr.get(f["family"], "??") }}'{% if not loop.last %},{% endif %}{% endfor %}],
+                datasets: [{
+                    label: '% Complete',
+                    data: [{% for f in families %}{{ (f['captured'] / f['total'] * 100) | round(1) if f['total'] > 0 else 0 }}{% if not loop.last %},{% endif %}{% endfor %}],
+                    backgroundColor: [{% for f in families %}'{{ colors.get(abbr.get(f["family"], ""), "#6366f1") }}'{% if not loop.last %},{% endif %}{% endfor %}]
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: { x: { max: 100, ticks: { callback: v => v + '%' }, grid: { color: 'rgba(128,128,128,0.15)' } }, y: { grid: { display: false } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // Status donut chart
+        new Chart(document.getElementById('statusDonut'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Not Started', 'In Progress', 'Evidence Collected', 'Reviewed', 'Complete'],
+                datasets: [{
+                    data: [{{ not_started_count }}, {{ totals['in_progress'] or 0 }}, {{ totals['evidence_collected'] or 0 }}, {{ totals['reviewed'] or 0 }}, {{ totals['captured'] or 0 }}],
+                    backgroundColor: ['#6b7280', '#60a5fa', '#fbbf24', '#a855f7', '#10b981']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8, font: { size: 11 } } } }
+            }
+        });
+    })();
     </script>
 
     <div class="hash-modal" id="hash-modal" onclick="if(event.target===this)this.classList.remove('show')">

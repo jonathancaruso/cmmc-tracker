@@ -11,6 +11,30 @@ Built for security teams, IT managers, and compliance officers preparing for CMM
 
 ---
 
+## Screenshots
+
+### Dashboard
+![Dashboard showing family progress bars, completion stats, and charts](screenshots/dashboard.png)
+*Track progress across all 14 NIST 800-171 control families with visual charts and status breakdowns.*
+
+### Family Detail
+![Family detail page with collapsible requirements and artifact uploads](screenshots/family-detail.png)
+*Drill into any family to manage objectives, upload evidence, assign team members, and track status.*
+
+### Evidence Library
+![Evidence library showing all artifacts with linking capability](screenshots/evidence-library.png)
+*Central evidence library lets you link one artifact to multiple objectives.*
+
+### POA&M Generator
+![POA&M page with risk levels and remediation plans](screenshots/poam.png)
+*Auto-generated Plan of Action & Milestones with inline editing for risk, remediation, and milestones.*
+
+### Assessment Report
+![Printable assessment report](screenshots/report.png)
+*Generate print-ready assessment reports covering all objectives, artifacts, and POA&M items.*
+
+---
+
 ## Why This Exists
 
 CMMC Level 2 certification requires organizations to demonstrate compliance with 320 assessment objectives across 14 control families. Most teams track this in spreadsheets, which quickly becomes unmanageable. Commercial GRC tools cost $15,000-50,000+/year and are overkill for small-to-mid defense contractors.
