@@ -5,7 +5,7 @@ from datetime import datetime
 from flask import Blueprint, render_template
 
 from models import get_db, FAMILY_ABBR, FAMILY_COLORS
-from utils import admin_required, get_org_id
+from utils import admin_required
 
 pages_bp = Blueprint('pages', __name__)
 
@@ -18,9 +18,8 @@ def landing():
 @pages_bp.route("/config")
 @admin_required
 def config_page():
-    org_id = get_org_id()
     conn = get_db()
-    members = conn.execute("SELECT * FROM team_members WHERE org_id = ? ORDER BY name", (org_id,)).fetchall()
+    members = conn.execute("SELECT * FROM team_members ORDER BY name").fetchall()
     counts = {}
     for m in members:
         row = conn.execute(
@@ -28,7 +27,7 @@ def config_page():
             (m["id"],)
         ).fetchone()
         counts[m["id"]] = row["c"]
-    domains = conn.execute("SELECT * FROM domains WHERE org_id = ? ORDER BY name", (org_id,)).fetchall()
+    domains = conn.execute("SELECT * FROM domains ORDER BY name").fetchall()
     conn.close()
     return render_template("config.html", members=members, counts=counts, domains=domains)
 
@@ -40,19 +39,13 @@ def member_detail(member_id):
     if not member:
         conn.close()
         return "Member not found", 404
-    org_id = get_org_id()
     assignments = conn.execute("""
-        SELECT a.id, a.objective_id, a.member_id, a.status as assign_status,
-               a.due_date, a.assigned_at,
-               o.family, o.assessment_objective,
-               COALESCE(p.captured, 0) as captured, p.captured_date,
-               COALESCE(p.artifact_notes, '') as artifact_notes
+        SELECT a.*, o.family, o.assessment_objective, o.captured, o.captured_date, o.artifact_notes
         FROM artifact_assignments a
         JOIN objectives o ON a.objective_id = o.id
-        LEFT JOIN objective_progress p ON o.id = p.objective_id AND p.org_id = ?
-        WHERE a.member_id = ? AND a.org_id = ?
+        WHERE a.member_id = ?
         ORDER BY o.sort_as
-    """, (org_id, member_id, org_id)).fetchall()
+    """, (member_id,)).fetchall()
     total = len(assignments)
     completed = sum(1 for a in assignments if a["captured"])
     overdue = sum(1 for a in assignments if a["due_date"] and a["due_date"] < datetime.now().strftime("%Y-%m-%d") and not a["captured"])

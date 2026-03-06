@@ -7,31 +7,27 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, Response
 
 from models import get_db, FAMILY_ABBR, FAMILY_COLORS
-from utils import log_audit, get_org_id
+from utils import log_audit
 
 poam_bp = Blueprint('poam', __name__)
 
 
 @poam_bp.route("/poam")
 def poam_page():
-    org_id = get_org_id()
     conn = get_db()
     rows = conn.execute("""
-        SELECT o.id, o.family, o.requirement_id, o.assessment_objective,
-               COALESCE(pr.status, 'Not Started') as status,
-               COALESCE(pr.artifact_notes, '') as artifact_notes,
-               o.security_requirement,
+        SELECT o.id, o.family, o.requirement_id, o.assessment_objective, o.status,
+               o.artifact_notes, o.security_requirement,
                p.weakness, p.remediation, p.resources, p.milestone_date, p.risk_level,
                GROUP_CONCAT(t.name, '; ') as assigned_to
         FROM objectives o
-        LEFT JOIN objective_progress pr ON o.id = pr.objective_id AND pr.org_id = ?
-        LEFT JOIN poam p ON o.id = p.objective_id AND p.org_id = ?
-        LEFT JOIN artifact_assignments a ON o.id = a.objective_id AND a.org_id = ?
+        LEFT JOIN poam p ON o.id = p.objective_id
+        LEFT JOIN artifact_assignments a ON o.id = a.objective_id
         LEFT JOIN team_members t ON a.member_id = t.id
-        WHERE COALESCE(pr.captured, 0) = 0
+        WHERE o.captured = 0
         GROUP BY o.id
         ORDER BY o.sort_as
-    """, (org_id, org_id, org_id)).fetchall()
+    """).fetchall()
     total_incomplete = len(rows)
     with_plan = sum(1 for r in rows if r['remediation'])
     by_risk = {'High': 0, 'Moderate': 0, 'Low': 0}
@@ -52,25 +48,24 @@ def update_poam():
     if not obj_id:
         return jsonify({"error": "objective_id required"}), 400
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    org_id = get_org_id()
     conn = get_db()
-    existing = conn.execute("SELECT id FROM poam WHERE objective_id = ? AND org_id = ?", (obj_id, org_id)).fetchone()
+    existing = conn.execute("SELECT id FROM poam WHERE objective_id = ?", (obj_id,)).fetchone()
     if existing:
         conn.execute("""
             UPDATE poam SET weakness=?, remediation=?, resources=?,
                    milestone_date=?, risk_level=?, updated_at=?
-            WHERE objective_id=? AND org_id=?
+            WHERE objective_id=?
         """, (data.get("weakness", ""), data.get("remediation", ""),
               data.get("resources", ""), data.get("milestone_date") or None,
-              data.get("risk_level", "Moderate"), now, obj_id, org_id))
+              data.get("risk_level", "Moderate"), now, obj_id))
     else:
         conn.execute("""
             INSERT INTO poam (objective_id, weakness, remediation, resources,
-                              milestone_date, risk_level, updated_at, org_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                              milestone_date, risk_level, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (obj_id, data.get("weakness", ""), data.get("remediation", ""),
               data.get("resources", ""), data.get("milestone_date") or None,
-              data.get("risk_level", "Moderate"), now, org_id))
+              data.get("risk_level", "Moderate"), now))
     log_audit('poam_saved', 'poam', obj_id,
               f"POA&M {'updated' if existing else 'created'} for {obj_id} (risk: {data.get('risk_level', 'Moderate')})",
               conn=conn)
@@ -81,11 +76,9 @@ def update_poam():
 
 @poam_bp.route("/api/poam/export")
 def export_poam_csv():
-    org_id = get_org_id()
     conn = get_db()
     rows = conn.execute("""
-        SELECT o.id, o.family, o.requirement_id, o.assessment_objective,
-               COALESCE(pr.status, 'Not Started') as status,
+        SELECT o.id, o.family, o.requirement_id, o.assessment_objective, o.status,
                o.security_requirement,
                COALESCE(p.weakness, '') as weakness,
                COALESCE(p.remediation, '') as remediation,
@@ -94,14 +87,13 @@ def export_poam_csv():
                COALESCE(p.risk_level, 'Moderate') as risk_level,
                GROUP_CONCAT(t.name, '; ') as assigned_to
         FROM objectives o
-        LEFT JOIN objective_progress pr ON o.id = pr.objective_id AND pr.org_id = ?
-        LEFT JOIN poam p ON o.id = p.objective_id AND p.org_id = ?
-        LEFT JOIN artifact_assignments a ON o.id = a.objective_id AND a.org_id = ?
+        LEFT JOIN poam p ON o.id = p.objective_id
+        LEFT JOIN artifact_assignments a ON o.id = a.objective_id
         LEFT JOIN team_members t ON a.member_id = t.id
-        WHERE COALESCE(pr.captured, 0) = 0
+        WHERE o.captured = 0
         GROUP BY o.id
         ORDER BY o.sort_as
-    """, (org_id, org_id, org_id)).fetchall()
+    """).fetchall()
     conn.close()
     output = io.StringIO()
     writer = csv.writer(output)

@@ -5,22 +5,21 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 
 from models import get_db
-from utils import log_audit, get_org_id
+from utils import log_audit
 
 assignments_bp = Blueprint('assignments', __name__)
 
 
 @assignments_bp.route("/api/assignments/<objective_id>")
 def list_assignments(objective_id):
-    org_id = get_org_id()
     conn = get_db()
     rows = conn.execute("""
         SELECT a.*, t.name as member_name, t.role as member_role
         FROM artifact_assignments a
         JOIN team_members t ON a.member_id = t.id
-        WHERE a.objective_id = ? AND a.org_id = ?
+        WHERE a.objective_id = ?
         ORDER BY a.assigned_at DESC
-    """, (objective_id, org_id)).fetchall()
+    """, (objective_id,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -32,20 +31,19 @@ def add_assignment():
     member_id = data.get("member_id")
     if not objective_id or not member_id:
         return jsonify({"error": "objective_id and member_id required"}), 400
-    org_id = get_org_id()
     conn = get_db()
     existing = conn.execute(
-        "SELECT id FROM artifact_assignments WHERE objective_id = ? AND member_id = ? AND org_id = ?",
-        (objective_id, member_id, org_id)
+        "SELECT id FROM artifact_assignments WHERE objective_id = ? AND member_id = ?",
+        (objective_id, member_id)
     ).fetchone()
     if existing:
         conn.close()
         return jsonify({"error": "Already assigned"}), 409
     conn.execute("""
-        INSERT INTO artifact_assignments (objective_id, member_id, status, due_date, assigned_at, org_id)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO artifact_assignments (objective_id, member_id, status, due_date, assigned_at)
+        VALUES (?, ?, ?, ?, ?)
     """, (objective_id, member_id, data.get("status", "assigned"),
-          data.get("due_date"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), org_id))
+          data.get("due_date"), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     member = conn.execute("SELECT name FROM team_members WHERE id = ?", (member_id,)).fetchone()
     member_name = member['name'] if member else f"#{member_id}"
     log_audit('created', 'assignment', objective_id,
@@ -103,7 +101,6 @@ def bulk_assign():
     member_id = data.get("member_id")
     if not requirement_id or not member_id:
         return jsonify({"error": "requirement_id and member_id required"}), 400
-    org_id = get_org_id()
     conn = get_db()
     objectives = conn.execute(
         "SELECT id FROM objectives WHERE requirement_id = ?", (requirement_id,)
@@ -112,14 +109,14 @@ def bulk_assign():
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     for obj in objectives:
         existing = conn.execute(
-            "SELECT id FROM artifact_assignments WHERE objective_id = ? AND member_id = ? AND org_id = ?",
-            (obj["id"], member_id, org_id)
+            "SELECT id FROM artifact_assignments WHERE objective_id = ? AND member_id = ?",
+            (obj["id"], member_id)
         ).fetchone()
         if not existing:
             conn.execute("""
-                INSERT INTO artifact_assignments (objective_id, member_id, status, assigned_at, org_id)
-                VALUES (?, ?, 'assigned', ?, ?)
-            """, (obj["id"], member_id, now, org_id))
+                INSERT INTO artifact_assignments (objective_id, member_id, status, assigned_at)
+                VALUES (?, ?, 'assigned', ?)
+            """, (obj["id"], member_id, now))
             added += 1
     member = conn.execute("SELECT name FROM team_members WHERE id = ?", (member_id,)).fetchone()
     member_name = member['name'] if member else f"#{member_id}"

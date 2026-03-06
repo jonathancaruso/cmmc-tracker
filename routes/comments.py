@@ -5,19 +5,18 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, session
 
 from models import get_db
-from utils import log_audit, get_org_id
+from utils import log_audit
 
 comments_bp = Blueprint('comments', __name__)
 
 
 @comments_bp.route("/api/comments/<objective_id>")
 def list_comments(objective_id):
-    org_id = get_org_id()
     conn = get_db()
     rows = conn.execute("""
-        SELECT * FROM objective_comments WHERE objective_id = ? AND org_id = ?
+        SELECT * FROM objective_comments WHERE objective_id = ?
         ORDER BY created_at DESC
-    """, (objective_id, org_id)).fetchall()
+    """, (objective_id,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -32,12 +31,11 @@ def add_comment():
     username = session.get("username", "system")
     user_id = session.get("user_id")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    org_id = get_org_id()
     conn = get_db()
     cur = conn.execute("""
-        INSERT INTO objective_comments (objective_id, user_id, username, comment, created_at, org_id)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (obj_id, user_id, username, comment, now, org_id))
+        INSERT INTO objective_comments (objective_id, user_id, username, comment, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    """, (obj_id, user_id, username, comment, now))
     comment_id = cur.lastrowid
     log_audit('comment_added', 'objective', obj_id, comment[:100], conn=conn)
     conn.commit()
@@ -69,14 +67,13 @@ def comment_counts():
     if not obj_ids:
         return jsonify({})
     ids = [x.strip() for x in obj_ids.split(",") if x.strip()]
-    org_id = get_org_id()
     conn = get_db()
     placeholders = ",".join("?" * len(ids))
     rows = conn.execute(f"""
         SELECT objective_id, COUNT(*) as cnt
         FROM objective_comments
-        WHERE objective_id IN ({placeholders}) AND org_id = ?
+        WHERE objective_id IN ({placeholders})
         GROUP BY objective_id
-    """, ids + [org_id]).fetchall()
+    """, ids).fetchall()
     conn.close()
     return jsonify({r["objective_id"]: r["cnt"] for r in rows})

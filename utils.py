@@ -7,7 +7,7 @@ import re
 import time
 from datetime import datetime
 
-from flask import session, request, redirect, url_for, jsonify, g
+from flask import session, request, redirect, url_for, jsonify
 
 from models import get_db, FAMILY_ABBR
 
@@ -24,11 +24,6 @@ def _check_rate_limit(ip):
         return False
     _login_attempts[ip].append(now)
     return True
-
-
-def get_org_id():
-    """Get current organization ID from session, default to 1."""
-    return session.get('org_id', 1)
 
 
 def validate_password(password):

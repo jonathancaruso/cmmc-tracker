@@ -3,7 +3,6 @@
 import os
 import re
 import sqlite3
-from datetime import datetime
 
 from openpyxl import load_workbook
 
@@ -50,31 +49,8 @@ def get_db():
     return conn
 
 
-def seed_org_progress(org_id):
-    """Seed objective_progress rows for a new organization (all objectives start as Not Started)."""
-    conn = get_db()
-    objectives = conn.execute("SELECT id FROM objectives").fetchall()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    for obj in objectives:
-        conn.execute("""
-            INSERT OR IGNORE INTO objective_progress (org_id, objective_id)
-            VALUES (?, ?)
-        """, (org_id, obj['id']))
-    conn.commit()
-    conn.close()
-    return len(objectives)
-
-
 def init_db():
     conn = get_db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS organizations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            slug TEXT NOT NULL UNIQUE,
-            created_at TEXT NOT NULL
-        )
-    """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS objectives (
             id TEXT PRIMARY KEY,
@@ -268,57 +244,6 @@ def init_db():
             """)
     except Exception:
         pass
-
-    # Migrate: add org_id to all tables for multi-tenant support
-    # Create objective_progress table for org-scoped progress tracking
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS objective_progress (
-            org_id INTEGER NOT NULL DEFAULT 1,
-            objective_id TEXT NOT NULL,
-            captured INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'Not Started',
-            artifact_notes TEXT DEFAULT '',
-            captured_date TEXT,
-            PRIMARY KEY (org_id, objective_id),
-            FOREIGN KEY (org_id) REFERENCES organizations(id),
-            FOREIGN KEY (objective_id) REFERENCES objectives(id)
-        )
-    """)
-
-    _ORG_TABLES = ['users', 'team_members', 'domains', 'artifacts',
-                   'artifact_assignments', 'poam', 'audit_log', 'objective_comments', 'ssp_mappings']
-    for table in _ORG_TABLES:
-        try:
-            conn.execute(f"SELECT org_id FROM {table} LIMIT 1")
-        except Exception:
-            try:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN org_id INTEGER DEFAULT 1 REFERENCES organizations(id)")
-            except Exception:
-                pass
-
-    # Ensure default organization exists
-    default_org = conn.execute("SELECT id FROM organizations WHERE id = 1").fetchone()
-    if not default_org:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn.execute(
-            "INSERT INTO organizations (id, name, slug, created_at) VALUES (1, 'Default Organization', 'default', ?)",
-            (now,)
-        )
-        # Set org_id=1 on all existing rows
-        for table in _ORG_TABLES:
-            try:
-                conn.execute(f"UPDATE {table} SET org_id = 1 WHERE org_id IS NULL")
-            except Exception:
-                pass
-
-    # Migrate existing objective progress data into objective_progress table
-    progress_count = conn.execute("SELECT COUNT(*) FROM objective_progress").fetchone()[0]
-    if progress_count == 0:
-        conn.execute("""
-            INSERT OR IGNORE INTO objective_progress (org_id, objective_id, captured, status, artifact_notes, captured_date)
-            SELECT 1, id, captured, COALESCE(status, 'Not Started'), COALESCE(artifact_notes, ''), captured_date
-            FROM objectives
-        """)
 
     conn.commit()
 

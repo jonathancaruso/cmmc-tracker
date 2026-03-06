@@ -40,7 +40,7 @@ def setup():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         display_name = f"{first_name} {last_name}"
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, first_name, last_name, created_at, org_id) VALUES (?, ?, ?, ?, ?, ?, 1)",
+            "INSERT INTO users (username, password_hash, role, first_name, last_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (username, generate_password_hash(password), 'admin', first_name, last_name, now)
         )
         conn.execute(
@@ -79,12 +79,6 @@ def login():
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
-            session['org_id'] = user['org_id'] or 1
-            # Load org name
-            conn2 = get_db()
-            org = conn2.execute("SELECT name FROM organizations WHERE id = ?", (session['org_id'],)).fetchone()
-            session['org_name'] = org['name'] if org else 'Default Organization'
-            conn2.close()
             return redirect(url_for('dashboard.dashboard'))
         return render_template("login.html", error="Invalid username or password")
     return render_template("login.html", error=None)

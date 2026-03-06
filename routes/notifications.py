@@ -8,32 +8,28 @@ from flask import Blueprint, render_template, request, jsonify, session
 import os
 
 from models import get_db, FAMILY_ABBR, FAMILY_COLORS
-from utils import admin_required, log_audit, get_org_id
+from utils import admin_required, log_audit
 
 notifications_bp = Blueprint('notifications', __name__)
 
 
-def get_overdue_assignments(conn, days_ahead=0, org_id=1):
+def get_overdue_assignments(conn, days_ahead=0):
     """Get assignments that are overdue or due within days_ahead days."""
     cutoff = (datetime.now() + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
     today = datetime.now().strftime("%Y-%m-%d")
 
     rows = conn.execute("""
         SELECT a.id as assignment_id, a.objective_id, a.due_date, a.status as assign_status,
-               o.family, o.assessment_objective,
-               COALESCE(p.status, 'Not Started') as obj_status,
-               COALESCE(p.captured, 0) as captured,
+               o.family, o.assessment_objective, o.status as obj_status, o.captured,
                t.id as member_id, t.name as member_name, t.email as member_email
         FROM artifact_assignments a
         JOIN objectives o ON a.objective_id = o.id
-        LEFT JOIN objective_progress p ON o.id = p.objective_id AND p.org_id = ?
         JOIN team_members t ON a.member_id = t.id
         WHERE a.due_date IS NOT NULL
           AND a.due_date <= ?
-          AND COALESCE(p.captured, 0) = 0
-          AND a.org_id = ?
+          AND o.captured = 0
         ORDER BY a.due_date ASC
-    """, (org_id, cutoff, org_id)).fetchall()
+    """, (cutoff,)).fetchall()
 
     overdue = []
     upcoming = []
@@ -51,9 +47,8 @@ def get_overdue_assignments(conn, days_ahead=0, org_id=1):
 
 @notifications_bp.route("/notifications")
 def notifications_page():
-    org_id = get_org_id()
     conn = get_db()
-    overdue, upcoming = get_overdue_assignments(conn, days_ahead=7, org_id=org_id)
+    overdue, upcoming = get_overdue_assignments(conn, days_ahead=7)
 
     # Group by member
     by_member = {}
@@ -81,9 +76,8 @@ def notifications_page():
 @notifications_bp.route("/api/notifications/summary")
 def notification_summary():
     """Quick count for nav badge."""
-    org_id = get_org_id()
     conn = get_db()
-    overdue, upcoming = get_overdue_assignments(conn, days_ahead=3, org_id=org_id)
+    overdue, upcoming = get_overdue_assignments(conn, days_ahead=3)
     conn.close()
     return jsonify({
         "overdue_count": len(overdue),
@@ -105,9 +99,8 @@ def send_overdue_emails():
     if not smtp_host:
         return jsonify({"error": "SMTP not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS env vars."}), 400
 
-    org_id = get_org_id()
     conn = get_db()
-    overdue, upcoming = get_overdue_assignments(conn, days_ahead=3, org_id=org_id)
+    overdue, upcoming = get_overdue_assignments(conn, days_ahead=3)
 
     # Group by member email
     by_email = {}
