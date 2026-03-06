@@ -3,3 +3,4 @@ openpyxl==3.1.5
 Pillow==12.1.1
 pypdf==6.7.5
 python-docx==1.2.0
+flask-swagger-ui==5.21.0

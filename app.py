@@ -43,6 +43,11 @@ def create_app():
     from routes.ssp import ssp_bp
     from routes.notifications import notifications_bp
     from routes.organizations import orgs_bp
+    from flask_swagger_ui import get_swaggerui_blueprint
+
+    SWAGGER_URL = '/api/docs'
+    API_URL = '/static/openapi.json'
+    swagger_bp = get_swaggerui_blueprint(SWAGGER_URL, API_URL, config={'app_name': 'CMMC Artifact Tracker API'})
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -59,6 +64,7 @@ def create_app():
     app.register_blueprint(ssp_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(orgs_bp)
+    app.register_blueprint(swagger_bp)
 
     # --- Auth middleware ---
     @app.before_request

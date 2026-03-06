@@ -40,5 +40,5 @@
 - [x] Import/export full state as zip backup
 - [x] Email notifications for overdue assignments
 - [x] Multi-tenant support (multiple organizations)
-- [ ] API documentation (OpenAPI/Swagger)
+- [x] API documentation (OpenAPI/Swagger)
 - [ ] Docker Compose production config (nginx, SSL)
