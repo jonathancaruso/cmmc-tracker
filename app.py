@@ -42,6 +42,7 @@ def create_app():
     from routes.backup import backup_bp
     from routes.ssp import ssp_bp
     from routes.notifications import notifications_bp
+    from routes.organizations import orgs_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -57,6 +58,7 @@ def create_app():
     app.register_blueprint(backup_bp)
     app.register_blueprint(ssp_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(orgs_bp)
 
     # --- Auth middleware ---
     @app.before_request
@@ -113,14 +115,20 @@ def create_app():
     # --- Inject current user into templates ---
     @app.context_processor
     def inject_user():
+        ctx = {'current_user': None, 'current_org': None, 'all_orgs': []}
         if 'user_id' in session:
             conn = get_db()
-            user = conn.execute("SELECT id, username, role, first_name, last_name FROM users WHERE id = ?",
+            user = conn.execute("SELECT id, username, role, first_name, last_name, org_id FROM users WHERE id = ?",
                                 (session['user_id'],)).fetchone()
-            conn.close()
             if user:
-                return {'current_user': dict(user)}
-        return {'current_user': None}
+                ctx['current_user'] = dict(user)
+                org_id = session.get('org_id', user['org_id'] or 1)
+                org = conn.execute("SELECT * FROM organizations WHERE id = ?", (org_id,)).fetchone()
+                ctx['current_org'] = dict(org) if org else {'id': 1, 'name': 'Default Organization'}
+                if user['role'] == 'admin':
+                    ctx['all_orgs'] = [dict(o) for o in conn.execute("SELECT id, name FROM organizations ORDER BY name").fetchall()]
+            conn.close()
+        return ctx
 
     # --- Security headers ---
     @app.after_request

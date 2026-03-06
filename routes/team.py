@@ -6,15 +6,16 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 
 from models import get_db
-from utils import log_audit, admin_required
+from utils import log_audit, admin_required, get_org_id
 
 team_bp = Blueprint('team', __name__)
 
 
 @team_bp.route("/api/team", methods=["GET"])
 def list_team():
+    org_id = get_org_id()
     conn = get_db()
-    members = conn.execute("SELECT * FROM team_members ORDER BY name").fetchall()
+    members = conn.execute("SELECT * FROM team_members WHERE org_id = ? ORDER BY name", (org_id,)).fetchall()
     conn.close()
     return jsonify([dict(m) for m in members])
 
@@ -26,11 +27,12 @@ def add_team_member():
     name = data.get("name", "").strip()
     if not name:
         return jsonify({"error": "Name required"}), 400
+    org_id = get_org_id()
     conn = get_db()
     conn.execute(
-        "INSERT INTO team_members (name, role, email, created_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO team_members (name, role, email, created_at, org_id) VALUES (?, ?, ?, ?, ?)",
         (name, data.get("role", ""), data.get("email", ""),
-         datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+         datetime.now().strftime("%Y-%m-%d %H:%M:%S"), org_id)
     )
     log_audit('created', 'team', name, f"Created team member {name}", conn=conn)
     conn.commit()
@@ -70,8 +72,9 @@ def update_team_member(member_id):
 
 @team_bp.route("/api/domains", methods=["GET"])
 def list_domains():
+    org_id = get_org_id()
     conn = get_db()
-    rows = conn.execute("SELECT * FROM domains ORDER BY name").fetchall()
+    rows = conn.execute("SELECT * FROM domains WHERE org_id = ? ORDER BY name", (org_id,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -84,9 +87,10 @@ def add_domain():
     color = data.get("color", "#6366f1").strip()
     if not name:
         return jsonify({"error": "Name required"}), 400
+    org_id = get_org_id()
     conn = get_db()
     try:
-        conn.execute("INSERT INTO domains (name, color) VALUES (?, ?)", (name, color))
+        conn.execute("INSERT INTO domains (name, color, org_id) VALUES (?, ?, ?)", (name, color, org_id))
         log_audit('created', 'domain', name, f"Created domain {name}", conn=conn)
         conn.commit()
     except sqlite3.IntegrityError:

@@ -7,7 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, session
 from werkzeug.security import generate_password_hash
 
 from models import get_db
-from utils import validate_password, log_audit, admin_required
+from utils import validate_password, log_audit, admin_required, get_org_id
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -39,17 +39,18 @@ def admin_create_user():
     errors = validate_password(password)
     if errors:
         return jsonify({"error": "; ".join(errors)}), 400
+    org_id = get_org_id()
     conn = get_db()
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     display_name = f"{first_name} {last_name}"
     try:
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, first_name, last_name, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (username, generate_password_hash(password), role, first_name, last_name, now)
+            "INSERT INTO users (username, password_hash, role, first_name, last_name, created_at, org_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password), role, first_name, last_name, now, org_id)
         )
         conn.execute(
-            "INSERT INTO team_members (name, role, email, created_at) VALUES (?, ?, ?, ?)",
-            (display_name, role, '', now)
+            "INSERT INTO team_members (name, role, email, created_at, org_id) VALUES (?, ?, ?, ?, ?)",
+            (display_name, role, '', now, org_id)
         )
         log_audit('created', 'user', username,
                   f"Created user {first_name} {last_name} ({username}) as {role}", conn=conn)

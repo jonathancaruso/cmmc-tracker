@@ -8,13 +8,14 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, abort, send_from_directory
 
 from models import get_db, ALLOWED_EXTENSIONS, UPLOAD_DIR
-from utils import log_audit, _extract_file_created, _generate_artifact_filename
+from utils import log_audit, _extract_file_created, _generate_artifact_filename, get_org_id
 
 artifacts_bp = Blueprint('artifacts', __name__)
 
 
 @artifacts_bp.route("/api/artifacts/<objective_id>")
 def list_artifacts(objective_id):
+    org_id = get_org_id()
     conn = get_db()
     rows = conn.execute("""
         SELECT a.*, d.name as domain_name, d.color as domain_color,
@@ -22,8 +23,8 @@ def list_artifacts(objective_id):
         FROM artifact_objectives ao
         JOIN artifacts a ON ao.artifact_id = a.id
         LEFT JOIN domains d ON a.domain_id = d.id
-        WHERE ao.objective_id = ? ORDER BY a.uploaded_at DESC
-    """, (objective_id, objective_id)).fetchall()
+        WHERE ao.objective_id = ? AND a.org_id = ? ORDER BY a.uploaded_at DESC
+    """, (objective_id, objective_id, org_id)).fetchall()
     result = []
     for r in rows:
         d = dict(r)
@@ -81,12 +82,13 @@ def upload_artifact():
 
     file_created = _extract_file_created(filepath, ext)
 
+    org_id = get_org_id()
     now_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor = conn.execute("""
-        INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at, domain_id, file_created)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO artifacts (objective_id, filename, original_name, file_size, mime_type, uploaded_at, domain_id, file_created, org_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (objective_id, f"{safe_id}/{filename}", file.filename, file_size,
-          file.content_type, now_ts, domain_id, file_created))
+          file.content_type, now_ts, domain_id, file_created, org_id))
     conn.execute("INSERT OR IGNORE INTO artifact_objectives (artifact_id, objective_id) VALUES (?, ?)",
                   (cursor.lastrowid, objective_id))
     log_audit('uploaded', 'artifact', objective_id, f"Uploaded {filename}", conn=conn)
@@ -217,13 +219,15 @@ def unlink_artifact(artifact_id, objective_id):
 
 @artifacts_bp.route("/api/artifacts/library")
 def artifacts_library_api():
+    org_id = get_org_id()
     conn = get_db()
     rows = conn.execute("""
         SELECT a.*, d.name as domain_name, d.color as domain_color
         FROM artifacts a
         LEFT JOIN domains d ON a.domain_id = d.id
+        WHERE a.org_id = ?
         ORDER BY a.uploaded_at DESC
-    """).fetchall()
+    """, (org_id,)).fetchall()
     result = []
     for r in rows:
         d = dict(r)

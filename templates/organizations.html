@@ -1,0 +1,110 @@
+{% extends "theme.html" %}
+{% block title %}Organizations{% endblock %}
+{% block content %}
+{% include "nav.html" %}
+<div class="topnav">
+    <div class="topnav-left">
+        <a href="/" class="back">&larr; Dashboard</a>
+        <h2 style="margin:0">Organizations</h2>
+    </div>
+    <div class="topnav-right">
+        <div class="nav-search">
+            <span class="icon">&#128269;</span>
+            <input id="nav-si" type="text" placeholder="Search (press /)" oninput="_debounceNav(this.value)">
+            <div id="nav-sr" class="search-results"></div>
+        </div>
+    </div>
+</div>
+
+<div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:2rem">
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;flex:1;min-width:300px">
+        <h3 style="margin:0 0 1rem 0">Create Organization</h3>
+        <div style="display:flex;gap:0.5rem">
+            <input id="org-name" type="text" placeholder="Organization name"
+                   style="flex:1;background:var(--bg-input);border:1px solid var(--border);color:var(--text-primary);padding:0.5rem 0.75rem;border-radius:0.5rem">
+            <button onclick="createOrg()" class="nav-btn" style="background:var(--accent);color:#fff;border:none">Create</button>
+        </div>
+    </div>
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.75rem;padding:1.5rem;min-width:200px;text-align:center">
+        <div style="font-size:2rem;font-weight:700">{{ orgs|length }}</div>
+        <div style="color:var(--text-dim);font-size:0.85rem">Total Organizations</div>
+    </div>
+</div>
+
+<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.75rem;overflow:hidden">
+    <table style="width:100%;border-collapse:collapse">
+        <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+                <th style="text-align:left;padding:0.75rem 1rem;color:var(--text-dim);font-size:0.8rem">Name</th>
+                <th style="text-align:left;padding:0.75rem 1rem;color:var(--text-dim);font-size:0.8rem">Slug</th>
+                <th style="text-align:center;padding:0.75rem 1rem;color:var(--text-dim);font-size:0.8rem">Users</th>
+                <th style="text-align:left;padding:0.75rem 1rem;color:var(--text-dim);font-size:0.8rem">Created</th>
+                <th style="text-align:right;padding:0.75rem 1rem;color:var(--text-dim);font-size:0.8rem">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for org in orgs %}
+            <tr id="org-{{ org.id }}" style="border-bottom:1px solid var(--bg-primary)">
+                <td style="padding:0.75rem 1rem;font-weight:600">
+                    <span id="org-name-{{ org.id }}">{{ org.name }}</span>
+                    {% if current_org and current_org.id == org.id %}
+                    <span style="background:var(--accent);color:#fff;font-size:0.65rem;padding:0.15rem 0.4rem;border-radius:0.25rem;margin-left:0.5rem">ACTIVE</span>
+                    {% endif %}
+                </td>
+                <td style="padding:0.75rem 1rem;color:var(--text-dim);font-size:0.85rem">{{ org.slug }}</td>
+                <td style="padding:0.75rem 1rem;text-align:center">{{ org.user_count }}</td>
+                <td style="padding:0.75rem 1rem;color:var(--text-dim);font-size:0.85rem">{{ org.created_at[:10] }}</td>
+                <td style="padding:0.75rem 1rem;text-align:right">
+                    <button onclick="switchOrg({{ org.id }}, '{{ org.name }}')" class="nav-btn" style="font-size:0.75rem"
+                        {% if current_org and current_org.id == org.id %}disabled{% endif %}>
+                        Switch
+                    </button>
+                    <button onclick="renameOrg({{ org.id }})" class="nav-btn" style="font-size:0.75rem">Rename</button>
+                    {% if org.id != 1 %}
+                    <button onclick="deleteOrg({{ org.id }}, '{{ org.name }}')" class="nav-btn" style="font-size:0.75rem;color:var(--danger, #ef4444)">Delete</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+const csrf = '{{ csrf_token() }}';
+const headers = {'Content-Type':'application/json','X-CSRF-Token':csrf};
+
+async function createOrg() {
+    const name = document.getElementById('org-name').value.trim();
+    if (!name) return;
+    const res = await fetch('/api/organizations', {method:'POST', headers, body:JSON.stringify({name})});
+    const data = await res.json();
+    if (data.ok) location.reload();
+    else alert(data.error || 'Failed');
+}
+
+async function switchOrg(id, name) {
+    const res = await fetch('/api/organizations/switch', {method:'POST', headers, body:JSON.stringify({org_id:id})});
+    const data = await res.json();
+    if (data.ok) location.href = '/';
+    else alert(data.error || 'Failed');
+}
+
+async function renameOrg(id) {
+    const newName = prompt('New name:');
+    if (!newName) return;
+    const res = await fetch(`/api/organizations/${id}`, {method:'PATCH', headers, body:JSON.stringify({name:newName})});
+    const data = await res.json();
+    if (data.ok) location.reload();
+    else alert(data.error || 'Failed');
+}
+
+async function deleteOrg(id, name) {
+    if (!confirm(`Delete organization "${name}"? This removes ALL its data (artifacts, assignments, progress).`)) return;
+    const res = await fetch(`/api/organizations/${id}`, {method:'DELETE', headers});
+    const data = await res.json();
+    if (data.ok) location.reload();
+    else alert(data.error || 'Failed');
+}
+</script>
+{% endblock %}
