@@ -16,18 +16,24 @@ def family_detail(family_name):
     objectives = conn.execute("""
         SELECT * FROM objectives WHERE family = ? ORDER BY sort_as
     """, (family_name,)).fetchall()
+    ssp_mappings = {}
+    for s in conn.execute("SELECT requirement_id, ssp_section, ssp_description FROM ssp_mappings").fetchall():
+        ssp_mappings[s["requirement_id"]] = {"ssp_section": s["ssp_section"] or "", "ssp_description": s["ssp_description"] or ""}
     conn.close()
 
     requirements = {}
     for obj in objectives:
         req_id = obj["requirement_id"]
         if req_id not in requirements:
+            ssp = ssp_mappings.get(req_id, {})
             requirements[req_id] = {
                 "id": req_id,
                 "security_requirement": obj["security_requirement"],
                 "examine": obj["examine"],
                 "interview": obj["interview"],
                 "test": obj["test"],
+                "ssp_section": ssp.get("ssp_section", ""),
+                "ssp_description": ssp.get("ssp_description", ""),
                 "objectives": [],
             }
         requirements[req_id]["objectives"].append(dict(obj))

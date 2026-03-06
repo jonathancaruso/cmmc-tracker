@@ -6,3 +6,4 @@ uploads/
 data/
 *.log
 .DS_Store
+.github/

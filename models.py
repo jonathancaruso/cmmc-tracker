@@ -166,6 +166,15 @@ def init_db():
             FOREIGN KEY (objective_id) REFERENCES objectives(id)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ssp_mappings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            requirement_id TEXT NOT NULL UNIQUE,
+            ssp_section TEXT DEFAULT '',
+            ssp_description TEXT DEFAULT '',
+            FOREIGN KEY (requirement_id) REFERENCES objectives(requirement_id)
+        )
+    """)
     conn.commit()
 
     # Migrate existing DBs: add columns if they don't exist

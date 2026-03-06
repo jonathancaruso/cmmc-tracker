@@ -39,6 +39,8 @@ def create_app():
     from routes.reports import reports_bp
     from routes.admin import admin_bp
     from routes.pages import pages_bp
+    from routes.backup import backup_bp
+    from routes.ssp import ssp_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -51,6 +53,8 @@ def create_app():
     app.register_blueprint(reports_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(pages_bp)
+    app.register_blueprint(backup_bp)
+    app.register_blueprint(ssp_bp)
 
     # --- Auth middleware ---
     @app.before_request

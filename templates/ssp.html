@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSP Mapping | CMMC Tracker</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 2rem; }
+
+        .section { background: var(--bg-secondary); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .section h2 { font-size: 1.125rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .family-badge { color: #fff; font-weight: 800; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 0.25rem; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+        td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--bg-primary); font-size: 0.85rem; vertical-align: top; }
+        tr:hover td { background: var(--bg-hover); }
+
+        .req-id { font-weight: 700; white-space: nowrap; }
+        .req-text { color: var(--text-secondary); font-size: 0.8rem; max-width: 400px; }
+        .ssp-input { background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 0.35rem 0.5rem; border-radius: 0.375rem; font-size: 0.8rem; width: 100%; }
+        .ssp-input:focus { border-color: var(--accent); outline: none; }
+        .ssp-input.saved { border-color: var(--success-text); }
+        .ssp-desc { min-height: 2.2rem; resize: vertical; font-family: inherit; }
+
+        .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: var(--success-bg); color: var(--success-text); padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.875rem; z-index: 9999; opacity: 0; transition: opacity 0.3s; pointer-events: none; border: 1px solid #065f46; }
+        .toast.show { opacity: 1; }
+    </style>
+{% include "theme.html" %}
+</head>
+<body>
+    <div class="container">
+        {% include 'nav.html' %}
+        <div class="topnav">
+            <div class="topnav-left">
+                <a href="/" class="back" style="color:var(--text-muted);text-decoration:none;font-size:0.875rem;">← Dashboard</a>
+                <h1 style="font-size:1.3rem;margin:0;">SSP Mapping</h1>
+            </div>
+            <div class="topnav-right">
+                {% if current_user %}
+                <a href="/config" class="nav-btn" style="font-size:0.75rem;">Config</a>
+                <a href="/artifacts" class="nav-btn" style="font-size:0.75rem;">Evidence Library</a>
+                <a href="/report" class="nav-btn" style="font-size:0.75rem;">Report</a>
+                {% if current_user.role == 'admin' %}<a href="/audit" class="nav-btn" style="font-size:0.75rem;">Audit Log</a>{% endif %}
+                <span style="color:var(--text-dim);font-size:0.8rem;">{{ current_user.first_name }} {{ current_user.last_name }}</span>
+                <a href="/logout" class="nav-btn" style="font-size:0.75rem;">Logout</a>
+                {% endif %}
+                <div class="nav-search">
+                    <span class="icon">🔍</span>
+                    <input type="text" id="nav-si" placeholder="Search... ( / )" oninput="_debounceNav(this.value)" onfocus="if(this.value) _doNavSearch(this.value)" autocomplete="off">
+                    <div class="search-results" id="nav-sr"></div>
+                </div>
+                <span class="font-controls"><button class="font-btn" onclick="changeFont(-10)" title="Smaller">A-</button><button class="font-btn" onclick="changeFont(10)" title="Larger">A+</button></span>
+                <button class="theme-toggle nav-btn" onclick="toggleTheme()">☀️</button>
+            </div>
+        </div>
+
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1.5rem;">
+            Map each NIST 800-171 requirement to the corresponding section of your System Security Plan.
+            Changes are saved automatically on blur.
+        </p>
+
+        {% for fam_name, fam in families.items() %}
+        <div class="section">
+            <h2>
+                <span class="family-badge" style="background:{{ fam.color }};">{{ fam.abbr }}</span>
+                {{ fam_name }}
+            </h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:6rem;">Req ID</th>
+                        <th>Security Requirement</th>
+                        <th style="width:10rem;">SSP Section</th>
+                        <th style="width:20rem;">SSP Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in fam.requirements %}
+                    <tr data-req-id="{{ r['requirement_id'] }}">
+                        <td><span class="req-id" style="color:{{ fam.color }};">{{ r['requirement_id'] }}</span></td>
+                        <td><span class="req-text">{{ r['security_requirement'] }}</span></td>
+                        <td>
+                            <input type="text" class="ssp-input ssp-section"
+                                   value="{{ r['ssp_section'] or '' }}"
+                                   placeholder="e.g. 3.1"
+                                   data-req-id="{{ r['requirement_id'] }}"
+                                   onblur="saveSSP(this)">
+                        </td>
+                        <td>
+                            <textarea class="ssp-input ssp-desc ssp-description"
+                                      placeholder="Description of SSP coverage..."
+                                      data-req-id="{{ r['requirement_id'] }}"
+                                      onblur="saveSSP(this)">{{ r['ssp_description'] or '' }}</textarea>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script>
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    let _saveTimers = {};
+    async function saveSSP(el) {
+        const reqId = el.dataset.reqId;
+        const row = el.closest('tr');
+        const section = row.querySelector('.ssp-section').value.trim();
+        const description = row.querySelector('.ssp-description').value.trim();
+
+        clearTimeout(_saveTimers[reqId]);
+        _saveTimers[reqId] = setTimeout(async () => {
+            const res = await _fetchJson(`/api/ssp/${encodeURIComponent(reqId)}`, {
+                method: 'PUT',
+                body: JSON.stringify({ ssp_section: section, ssp_description: description })
+            });
+            if (res.ok) {
+                el.classList.add('saved');
+                setTimeout(() => el.classList.remove('saved'), 1500);
+                showToast('SSP mapping saved');
+            }
+        }, 300);
+    }
+    </script>
+</body>
+</html>

@@ -53,6 +53,7 @@
             </div>
             <div class="topnav-right">
                 {% if current_user %}
+                <a href="/ssp" class="nav-btn" style="font-size:0.75rem;">SSP Mapping</a>
                 <a href="/artifacts" class="nav-btn" style="font-size:0.75rem;">Evidence Library</a>
                 <a href="/report" class="nav-btn" style="font-size:0.75rem;">Report</a>
                 {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-btn" style="font-size:0.75rem;">Users</a><a href="/audit" class="nav-btn" style="font-size:0.75rem;">Audit Log</a>{% endif %}
@@ -154,6 +155,21 @@
             {% endif %}
         </div>
 
+        {% if current_user and current_user.role == 'admin' %}
+        <div class="section">
+            <h2>Backup & Restore</h2>
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:1rem;">Export or import a full backup (database + uploaded artifacts) as a ZIP archive.</p>
+            <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+                <a href="/api/backup/export" class="add-btn" style="text-decoration:none;display:inline-block;">Export Backup (.zip)</a>
+                <label class="add-btn" style="cursor:pointer;">
+                    Import Backup (.zip)
+                    <input type="file" accept=".zip" style="display:none" onchange="importBackup(this)">
+                </label>
+                <span id="backup-status" style="font-size:0.8rem;color:var(--text-dim);"></span>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="section">
             <h2>About</h2>
             <p style="color:var(--text-muted);font-size:0.85rem;line-height:1.6;">
@@ -219,6 +235,36 @@
         if (!confirm(`Delete "${name}"? Artifacts will be untagged.`)) return;
         await _fetchJson(`/api/domains/${id}`, { method: 'DELETE' });
         location.reload();
+    }
+
+    async function importBackup(input) {
+        if (!input.files.length) return;
+        if (!confirm('This will REPLACE the current database and all uploaded artifacts. Are you sure?')) {
+            input.value = '';
+            return;
+        }
+        const status = document.getElementById('backup-status');
+        status.textContent = 'Importing...';
+        status.style.color = 'var(--warning-text)';
+
+        const fd = new FormData();
+        fd.append('file', input.files[0]);
+        try {
+            const res = await _fetchForm('/api/backup/import', fd);
+            const data = await res.json();
+            if (data.ok) {
+                status.textContent = `Restored ${data.files_restored} files. Reloading...`;
+                status.style.color = 'var(--success-text)';
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                status.textContent = data.error || 'Import failed';
+                status.style.color = 'var(--danger-text)';
+            }
+        } catch(err) {
+            status.textContent = 'Import failed: ' + err.message;
+            status.style.color = 'var(--danger-text)';
+        }
+        input.value = '';
     }
     </script>
 </body>

@@ -24,19 +24,26 @@ def export_csv():
         ORDER BY t.name
     """).fetchall():
         assignments.setdefault(a["objective_id"], []).append(a["name"])
+    ssp = {}
+    for s in conn.execute("SELECT requirement_id, ssp_section, ssp_description FROM ssp_mappings").fetchall():
+        ssp[s["requirement_id"]] = {"section": s["ssp_section"] or "", "description": s["ssp_description"] or ""}
     conn.close()
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["ID", "Family", "Requirement", "Objective", "Status",
-                     "Captured", "Notes", "Date Captured", "Assigned To"])
+                     "Captured", "Notes", "Date Captured", "Assigned To",
+                     "SSP Section", "SSP Description"])
     for r in rows:
         assigned = "; ".join(assignments.get(r["id"], []))
+        ssp_data = ssp.get(r["requirement_id"], {})
         writer.writerow([r["id"], r["family"], r["requirement_id"],
                          r["assessment_objective"],
                          r["status"] or "Not Started",
                          "Yes" if r["captured"] else "No",
                          r["artifact_notes"], r["captured_date"] or "",
-                         assigned])
+                         assigned,
+                         ssp_data.get("section", ""),
+                         ssp_data.get("description", "")])
     return Response(output.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment;filename=cmmc-progress.csv"})
 
