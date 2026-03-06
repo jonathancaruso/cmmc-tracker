@@ -35,10 +35,10 @@
 
 ## Backlog (Priority Order)
 - [x] Comments/activity log per objective
-- [ ] Dashboard charts (bar/pie for visual progress)
-- [ ] SSP mapping — link requirements to System Security Plan sections
-- [ ] Import/export full state as zip backup
-- [ ] Email notifications for overdue assignments
+- [x] Dashboard charts (bar/pie for visual progress)
+- [x] SSP mapping — link requirements to System Security Plan sections
+- [x] Import/export full state as zip backup
+- [x] Email notifications for overdue assignments
 - [ ] Multi-tenant support (multiple organizations)
 - [ ] API documentation (OpenAPI/Swagger)
 - [ ] Docker Compose production config (nginx, SSL)

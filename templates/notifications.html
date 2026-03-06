@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifications — CMMC Artifact Tracker</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg-primary); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        :root { --bg-primary: #0f172a; --bg-secondary: #1e293b; --text-primary: #e2e8f0; --text-muted: #94a3b8; --text-dim: #64748b; --border: #334155; --link: #38bdf8; --accent: #38bdf8; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        h1 { font-size: 1.5rem; font-weight: 700; }
+        .btn { background: var(--border); color: var(--text-primary); border: 1px solid #475569; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.875rem; text-decoration: none; }
+        .btn:hover { background: #475569; }
+
+        .stats { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: var(--bg-secondary); border-radius: 0.75rem; padding: 1rem 1.5rem; min-width: 140px; }
+        .stat-card .num { font-size: 2rem; font-weight: 800; }
+        .stat-card .label { font-size: 0.75rem; color: var(--text-muted); }
+
+        .member-section { background: var(--bg-secondary); border-radius: 0.75rem; padding: 1.25rem; margin-bottom: 1rem; }
+        .member-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .member-name { font-weight: 700; font-size: 1rem; }
+        .member-email { color: var(--text-muted); font-size: 0.8rem; }
+        .badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 0.25rem; font-weight: 600; }
+        .badge-overdue { background: #450a0a; color: #ef4444; }
+        .badge-upcoming { background: #422006; color: #f59e0b; }
+
+        .notif-item { display: flex; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--bg-primary); font-size: 0.8rem; align-items: center; }
+        .notif-item:last-child { border-bottom: none; }
+        .notif-obj-id { color: var(--link); font-weight: 700; min-width: 5rem; white-space: nowrap; }
+        .notif-text { flex: 1; }
+        .notif-due { white-space: nowrap; font-size: 0.75rem; }
+        .notif-overdue { color: #ef4444; font-weight: 700; }
+        .notif-soon { color: #f59e0b; }
+        .family-tag { font-size: 0.65rem; padding: 0.1rem 0.3rem; border-radius: 0.2rem; font-weight: 700; }
+
+        .smtp-notice { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-muted); }
+        .smtp-notice code { background: var(--bg-primary); padding: 0.1rem 0.3rem; border-radius: 0.2rem; }
+
+        .empty-state { text-align: center; padding: 3rem 2rem; color: var(--text-muted); }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 0.5rem; }
+
+        .toast { position: fixed; bottom: 2rem; right: 2rem; background: #065f46; color: #34d399; padding: 0.75rem 1.25rem; border-radius: 0.5rem; font-size: 0.85rem; z-index: 200; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔔 Notifications</h1>
+            <div style="display:flex;gap:0.5rem;">
+                <a href="/" class="btn">← Dashboard</a>
+                {% if smtp_configured %}
+                <button onclick="sendEmails(this)" class="btn" style="background:#1e40af;color:#fff;border-color:#2563eb;">📧 Send Email Reminders</button>
+                {% endif %}
+            </div>
+        </header>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="num" style="color:#ef4444;">{{ overdue|length }}</div>
+                <div class="label">Overdue</div>
+            </div>
+            <div class="stat-card">
+                <div class="num" style="color:#f59e0b;">{{ upcoming|length }}</div>
+                <div class="label">Due within 7 days</div>
+            </div>
+        </div>
+
+        {% if not smtp_configured %}
+        <div class="smtp-notice">
+            📧 Email notifications available. Set env vars: <code>SMTP_HOST</code> <code>SMTP_PORT</code> <code>SMTP_USER</code> <code>SMTP_PASS</code> <code>SMTP_FROM</code>
+        </div>
+        {% endif %}
+
+        {% if by_member %}
+        {% for mid, member in by_member.items() %}
+        <div class="member-section">
+            <div class="member-header">
+                <div>
+                    <span class="member-name">{{ member.name }}</span>
+                    {% if member.email %}<span class="member-email"> &lt;{{ member.email }}&gt;</span>{% endif %}
+                </div>
+                <div style="display:flex;gap:0.5rem;">
+                    {% if member.overdue %}<span class="badge badge-overdue">{{ member.overdue|length }} overdue</span>{% endif %}
+                    {% if member.upcoming %}<span class="badge badge-upcoming">{{ member.upcoming|length }} due soon</span>{% endif %}
+                </div>
+            </div>
+
+            {% for item in member.overdue %}
+            <div class="notif-item">
+                {% set fab = abbr.get(item.family, '??') %}
+                <span class="family-tag" style="background:{{ colors.get(fab, '#6366f1') }}22;color:{{ colors.get(fab, '#6366f1') }};">{{ fab }}</span>
+                <span class="notif-obj-id">{{ item.objective_id }}</span>
+                <span class="notif-text">{{ item.assessment_objective[:100] }}{% if item.assessment_objective|length > 100 %}...{% endif %}</span>
+                <span class="notif-due notif-overdue">{{ item.due_date }} ({{ item.days_until|abs }}d overdue)</span>
+            </div>
+            {% endfor %}
+
+            {% for item in member.upcoming %}
+            <div class="notif-item">
+                {% set fab = abbr.get(item.family, '??') %}
+                <span class="family-tag" style="background:{{ colors.get(fab, '#6366f1') }}22;color:{{ colors.get(fab, '#6366f1') }};">{{ fab }}</span>
+                <span class="notif-obj-id">{{ item.objective_id }}</span>
+                <span class="notif-text">{{ item.assessment_objective[:100] }}{% if item.assessment_objective|length > 100 %}...{% endif %}</span>
+                <span class="notif-due notif-soon">{{ item.due_date }} ({{ item.days_until }}d)</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">✅</div>
+            <h2>No overdue or upcoming assignments</h2>
+            <p>All assignments are on track.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script>
+    async function sendEmails(btn) {
+        if (!confirm('Send email reminders to all team members with overdue/upcoming assignments?')) return;
+        btn.disabled = true; btn.textContent = '📧 Sending...';
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const res = await fetch('/api/notifications/send-email', { method: 'POST', headers: {'X-CSRF-Token': csrf} });
+            const data = await res.json();
+            showToast(data.ok ? `Sent ${data.sent} emails` : (data.error || 'Failed'));
+        } catch(e) { showToast('Error: ' + e.message); }
+        btn.disabled = false; btn.textContent = '📧 Send Email Reminders';
+    }
+    function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 3000); }
+    </script>
+</body>
+</html>

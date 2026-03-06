@@ -41,6 +41,7 @@ def create_app():
     from routes.pages import pages_bp
     from routes.backup import backup_bp
     from routes.ssp import ssp_bp
+    from routes.notifications import notifications_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(dashboard_bp)
@@ -55,6 +56,7 @@ def create_app():
     app.register_blueprint(pages_bp)
     app.register_blueprint(backup_bp)
     app.register_blueprint(ssp_bp)
+    app.register_blueprint(notifications_bp)
 
     # --- Auth middleware ---
     @app.before_request
